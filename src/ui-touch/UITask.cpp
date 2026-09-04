@@ -1669,14 +1669,17 @@ static volatile bool s_v4_beep_playing = false;
 static volatile bool s_v4_mention = false;
 static void v4BeepTaskFn(void* arg) {
   (void)arg;
+  // "Loud alerts" shifts the chime into the piezo's resonant band (~4 kHz)
+  // where the same drive is far louder than the default 1-2.6 kHz (#388).
+  const bool loud = touchPrefsGetLoudAlerts();
   if (s_v4_mention) {
-    tone(UI_BUZZER_PIN, 1500);  vTaskDelay(pdMS_TO_TICKS(110));
-    tone(UI_BUZZER_PIN, 2000);  vTaskDelay(pdMS_TO_TICKS(110));
-    tone(UI_BUZZER_PIN, 2600);  vTaskDelay(pdMS_TO_TICKS(170));
+    tone(UI_BUZZER_PIN, loud ? 3400 : 1500);  vTaskDelay(pdMS_TO_TICKS(110));
+    tone(UI_BUZZER_PIN, loud ? 3900 : 2000);  vTaskDelay(pdMS_TO_TICKS(110));
+    tone(UI_BUZZER_PIN, loud ? 4200 : 2600);  vTaskDelay(pdMS_TO_TICKS(170));
   } else {
-    tone(UI_BUZZER_PIN, 1000);  vTaskDelay(pdMS_TO_TICKS(160));
-    tone(UI_BUZZER_PIN, 1500);  vTaskDelay(pdMS_TO_TICKS(160));
-    tone(UI_BUZZER_PIN, 2000);  vTaskDelay(pdMS_TO_TICKS(200));
+    tone(UI_BUZZER_PIN, loud ? 3200 : 1000);  vTaskDelay(pdMS_TO_TICKS(160));
+    tone(UI_BUZZER_PIN, loud ? 3700 : 1500);  vTaskDelay(pdMS_TO_TICKS(160));
+    tone(UI_BUZZER_PIN, loud ? 4000 : 2000);  vTaskDelay(pdMS_TO_TICKS(200));
   }
   noTone(UI_BUZZER_PIN);
   pinMode(UI_BUZZER_PIN, INPUT);   // high-Z → no idle current / no buzz
@@ -9135,6 +9138,16 @@ static inline void uiSoundPreview() {
   uiPlayNotify();
 #endif
 }
+// "Loud alerts": raises the chime pitch into the piezo's resonant band (#388).
+#if defined(HAS_UI_SOUND)
+static void toggleLoudAlertsCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+  const bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+  touchPrefsSetLoudAlerts(on);
+  if (g_lv.task) g_lv.task->showAlert(on ? TR("Loud alerts: on") : TR("Loud alerts: off"), 1100);
+  uiPlayNotify();   // audible preview while the switch is under your finger
+}
+#endif
 // Message-sound switch (under the master Sound switch). VALUE_CHANGED; previews.
 static void toggleMessageSoundCb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
@@ -12401,6 +12414,24 @@ static void clock12hToggleCb(lv_event_t* e) {
   if (g_lv.task) g_lv.task->showAlert(on ? TR("Clock: 12-hour") : TR("Clock: 24-hour"), 900);
 }
 
+#if CAP_BOOT_TIME_SYNC
+static void bootWifiTimeToggleCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+  const bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+  touchPrefsSetBootWifiTime(on);
+  lv_obj_t* open_sw = static_cast<lv_obj_t*>(lv_event_get_user_data(e));
+  if (open_sw && lv_obj_is_valid(open_sw)) {
+    if (on) lv_obj_clear_state(open_sw, LV_STATE_DISABLED);
+    else    lv_obj_add_state(open_sw, LV_STATE_DISABLED);
+  }
+}
+static void bootWifiOpenToggleCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+  touchPrefsSetBootWifiTimeOpen(
+      lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+}
+#endif
+
 #if CAP_UI_SIZE
 // UI-size selector — saves the board-specific preset. Fonts and any matching
 // geometry are selected while the UI tree is built, so prompt for a restart.
@@ -13236,6 +13267,19 @@ static void buildDeviceSettings(int sec) {
     lv_obj_add_event_cb(sw, toggleBuzzerCb, LV_EVENT_VALUE_CHANGED, nullptr);
     y += LV_MAX(34, rh + 12);
   }
+#if defined(HAS_UI_SOUND)
+  // Loud alerts: higher-pitched chime louder on piezo buzzers (#388).
+  {
+    int rh = settingsRowLabel(body, y, 6, TR("Loud alerts"), COLOR_SUB, nullptr, 56);
+    lv_obj_t* sw = lv_switch_create(body);
+    lv_obj_align(sw, LV_ALIGN_TOP_RIGHT, 0, y);
+    if (touchPrefsGetLoudAlerts()) lv_obj_add_state(sw, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(sw, toggleLoudAlertsCb, LV_EVENT_VALUE_CHANGED, nullptr);
+    y += LV_MAX(34, rh + 12);
+    y += settingsRowLabel(body, y, 0, TR("higher-pitched chime; louder on most buzzers"),
+                          COLOR_SUB, &g_font_12, 0) + 2;
+  }
+#endif
   // Per-event on/off switches: Message, DM, @-mention (under the master Sound).
   {
     int rh = settingsRowLabel(body, y, 6, TR("Message sound"), COLOR_SUB, nullptr, 56);
@@ -13530,6 +13574,29 @@ static void buildDeviceSettings(int sec) {
     lv_obj_add_event_cb(sw, clock12hToggleCb, LV_EVENT_VALUE_CHANGED, nullptr);
     y += LV_MAX(40, h + 12);
   }
+#if CAP_BOOT_TIME_SYNC
+  {
+    lv_obj_t* boot_sync_sw = lv_switch_create(body);
+    lv_obj_t* open_sync_sw = lv_switch_create(body);
+    {
+      int h = settingsRowLabel(body, y, 6, TR("Sync time from saved Wi-Fi after cold boot"),
+                               COLOR_SUB, nullptr, 56);
+      lv_obj_align(boot_sync_sw, LV_ALIGN_TOP_RIGHT, 0, y);
+      if (touchPrefsGetBootWifiTime()) lv_obj_add_state(boot_sync_sw, LV_STATE_CHECKED);
+      y += LV_MAX(SC(34), h + 12);
+    }
+    {
+      int h = settingsRowLabel(body, y, 6, TR("Allow saved open networks for time sync"),
+                               COLOR_SUB, nullptr, 56);
+      lv_obj_align(open_sync_sw, LV_ALIGN_TOP_RIGHT, 0, y);
+      if (touchPrefsGetBootWifiTimeOpen()) lv_obj_add_state(open_sync_sw, LV_STATE_CHECKED);
+      if (!touchPrefsGetBootWifiTime()) lv_obj_add_state(open_sync_sw, LV_STATE_DISABLED);
+      y += LV_MAX(SC(34), h + 12);
+    }
+    lv_obj_add_event_cb(boot_sync_sw, bootWifiTimeToggleCb, LV_EVENT_VALUE_CHANGED, open_sync_sw);
+    lv_obj_add_event_cb(open_sync_sw, bootWifiOpenToggleCb, LV_EVENT_VALUE_CHANGED, nullptr);
+  }
+#endif
   }
   if (sec == DSEC_DISPLAY) {
 

@@ -136,6 +136,9 @@ static void cfgSetDefaults(TouchCfg& c) {
   c.console_mode      = 0;      // OFF: boot into the graphical UI (CONSOLE_MODE.md)
   c.console_monitor   = 1;      // ON: the console shows messages as they arrive
   c.kb_force_legacy   = 0;      // OFF: detect the keyboard protocol automatically
+  c.boot_wifi_time    = 0;      // OFF: no cold-boot Wi-Fi time sync (#383) — opt-in
+  c.boot_wifi_open    = 0;      // OFF: and never a saved OPEN network even then
+  c.loud_alerts       = 0;      // OFF: the standard chime pitch unless asked for
   c.compact_chat      = 0;      // OFF: bubble chat layout (opt-in IRC-style dense rows)
   c.clock_floor       = 0;      // no persisted send-timestamp floor yet
   c.rx_queue          = 1;      // ON: buffered receive (test-channel default; opt-out toggle in Radio & Mesh)
@@ -266,11 +269,13 @@ static void cfgLoadOrMigrate() {
         if (stored_version < 54) s_cfg.lock_msg_preview = 1;  // v54: message preview on lock screen, default ON
         if (stored_version < 55) s_cfg.lock_dim_pct = 8;      // v55: always-on dim brightness, default 8%
         if (stored_version < 56) s_cfg.sleep_idle = 1;        // v56: idle sleep ON by default (was OFF)
-        if (stored_version < 57) s_cfg.lock_always_on = 1;   // v57: always-on lock screen ON by default (was OFF)
-        if (stored_version < 58) { s_cfg.auto_theme_sun = 0; s_cfg.auto_aod_sun = 0; }  // v58: sun auto-theme/AOD fields added (were off)
+        if (stored_version < 57) s_cfg.lock_always_on = 1;    // v57: always-on lock screen ON by default (was OFF)
+        if (stored_version < 58) { s_cfg.auto_theme_sun = 0; s_cfg.auto_aod_sun = 0; }  // v58: sun auto-theme/AOD added (off)
         if (stored_version < 59) { s_cfg.auto_theme_sun = 1; s_cfg.auto_aod_sun = 1; }  // v59: flip to ON for existing users
-        if (stored_version < 60) s_cfg.kb_force_legacy = 0;  // v60: kb protocol override, default auto-detect
+        if (stored_version < 60) s_cfg.kb_force_legacy = 0;   // v60: kb protocol override, default auto-detect
         if (stored_version < 61) { s_cfg.night_theme = 0; s_cfg.day_theme = 1; }  // v61: per-theme auto day/night
+        // v62 (#383, #388): cold-boot Wi-Fi time sync + loud alerts — force OFF for existing users
+        if (stored_version < 62) { s_cfg.boot_wifi_time = 0; s_cfg.boot_wifi_open = 0; s_cfg.loud_alerts = 0; }
         if (stored_version < 31) s_cfg.compact_chat = 0;  // new trailing field: compact chat rows off by default
         if (stored_version < 32) s_cfg.clock_floor = 0;   // new trailing field: no send-timestamp floor persisted yet (#89)
         if (stored_version < 33) s_cfg.rx_queue = 1;      // buffered LoRa receive ON for the test channel (opt-out toggle in Radio & Mesh)
@@ -1201,6 +1206,36 @@ bool touchPrefsGetKbForceLegacy() {
 bool touchPrefsSetKbForceLegacy(bool on) {
   if (!s_begun) touchPrefsBegin();
   s_cfg.kb_force_legacy = on ? 1 : 0;
+  return cfgFlush();
+}
+
+bool touchPrefsGetBootWifiTime() {
+  if (!s_begun) touchPrefsBegin();
+  return s_cfg.boot_wifi_time != 0;
+}
+bool touchPrefsSetBootWifiTime(bool on) {
+  if (!s_begun) touchPrefsBegin();
+  s_cfg.boot_wifi_time = on ? 1 : 0;
+  return cfgFlush();
+}
+
+bool touchPrefsGetBootWifiTimeOpen() {
+  if (!s_begun) touchPrefsBegin();
+  return s_cfg.boot_wifi_open != 0;
+}
+bool touchPrefsSetBootWifiTimeOpen(bool on) {
+  if (!s_begun) touchPrefsBegin();
+  s_cfg.boot_wifi_open = on ? 1 : 0;
+  return cfgFlush();
+}
+
+bool touchPrefsGetLoudAlerts() {
+  if (!s_begun) touchPrefsBegin();
+  return s_cfg.loud_alerts != 0;
+}
+bool touchPrefsSetLoudAlerts(bool on) {
+  if (!s_begun) touchPrefsBegin();
+  s_cfg.loud_alerts = on ? 1 : 0;
   return cfgFlush();
 }
 

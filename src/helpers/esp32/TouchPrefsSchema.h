@@ -9,7 +9,7 @@
 namespace TouchPrefsSchema {
 
 static constexpr uint16_t MAGIC = 0x5743;   // 'WC' (WadaCfg)
-static constexpr uint8_t CURRENT_VERSION = 61;   // ...v58: auto_theme_sun + auto_aod_sun; v59: auto_theme_sun + auto_aod_sun default ON; v60: kb_force_legacy (older keyboard protocol, default OFF); v61: night_theme + day_theme (per-theme auto day/night switch)   // v49: fem_lna default flip on the V4-R8; v50: map tile z/x/y line off by default (no new fields); v51: console_mode (boot into the text console; new trailing field, default OFF); v52: console_monitor (show incoming messages in the console, default ON); v53: lock screen prefs (show_time/date/weekday/username/unread/batt, bg_color, always_on); v54: lock_msg_preview (show message preview card on lock screen, default 1)
+static constexpr uint8_t CURRENT_VERSION = 62;   // v49: fem_lna; v50: map_show_tilexyz; v51: console_mode; v52: console_monitor; v53: lock screen prefs; v54: lock_msg_preview; v55: lock_dim_pct; v56: sleep_idle ON; v57: lock_always_on ON; v58: auto_theme_sun+auto_aod_sun; v59: both ON; v60: kb_force_legacy; v61: night_theme+day_theme; v62: boot_wifi_time+boot_wifi_open+loud_alerts (#383, #388)
 static constexpr uint8_t BROKEN_MID_INSERT_VERSION = 44;
 
 // Persisted byte layout. New fields must be appended at the end: older blobs
@@ -105,6 +105,10 @@ struct __attribute__((packed)) Config {
   // v61: per-theme selection for auto day/night switch
   uint8_t  night_theme;         // theme index used at night (default 0=Dark)
   uint8_t  day_theme;           // theme index used during day (default 1=Light)
+  // v62 (#383, #388): cold-boot Wi-Fi time sync + loud alerts
+  uint8_t  boot_wifi_time;   // sync the clock from a saved Wi-Fi network after a cold boot
+  uint8_t  boot_wifi_open;   // ...and allow saved OPEN networks to be used for it
+  uint8_t  loud_alerts;      // play the notification chime at the piezo's resonant pitch (#388)
 };
 
 static constexpr size_t HEADER_SIZE = offsetof(Config, bright);
@@ -112,7 +116,9 @@ static constexpr size_t STABLE_V44_PREFIX_SIZE = offsetof(Config, web_mirror);
 
 static_assert(offsetof(Config, web_mirror) == offsetof(Config, rx_queue) + sizeof(Config::rx_queue),
               "the pre-v44 suffix moved");
-static_assert(offsetof(Config, day_theme) + sizeof(Config::day_theme) == sizeof(Config),
+static_assert(sizeof(Config) <= 2048,
+              "Config exceeds the SdNvsPrefs value cap; prefs would silently stop saving");
+static_assert(offsetof(Config, loud_alerts) + sizeof(Config::loud_alerts) == sizeof(Config),
               "new preference fields must remain trailing");
 static_assert(offsetof(Config, night_theme) ==
                   offsetof(Config, kb_force_legacy) + sizeof(Config::kb_force_legacy),
@@ -150,6 +156,15 @@ static_assert(offsetof(Config, lock_show_time) ==
 static_assert(offsetof(Config, lock_always_on) ==
                   offsetof(Config, lock_bg_color) + sizeof(Config::lock_bg_color),
               "lock_always_on must follow lock_bg_color");
+static_assert(offsetof(Config, boot_wifi_time) ==
+                  offsetof(Config, day_theme) + sizeof(Config::day_theme),
+              "boot_wifi_time must follow day_theme");
+static_assert(offsetof(Config, boot_wifi_open) ==
+                  offsetof(Config, boot_wifi_time) + sizeof(Config::boot_wifi_time),
+              "boot_wifi_open must follow boot_wifi_time");
+static_assert(offsetof(Config, loud_alerts) ==
+                  offsetof(Config, boot_wifi_open) + sizeof(Config::boot_wifi_open),
+              "loud_alerts must follow boot_wifi_open");
 
 // Overlay a persisted blob on caller-provided defaults. Beta 57 wrote v44 with
 // retry_echo inserted before web_mirror, shifting every later value. That blob

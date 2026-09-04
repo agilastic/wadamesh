@@ -1126,3 +1126,14 @@ Lock screen always-on	Sperrbildschirm immer aktiv
 Lock screen turns off	Sperrbildschirm schaltet ab
 Dim brightness	Gedimmte Helligkeit
 Message preview	Nachrichtenvorschau
+Allow saved open networks for time sync	Allow saved open networks for time sync
+Sync time from saved Wi-Fi after cold boot	Sync time from saved Wi-Fi after cold boot
+Accent colour	Accent colour
+Loud alerts	Loud alerts
+Loud alerts: off	Loud alerts: off
+Loud alerts: on	Loud alerts: on
+higher-pitched chime; louder on most buzzers	higher-pitched chime; louder on most buzzers
+path unknown	path unknown
+direct	direct
+hop	hop
+hops	hops

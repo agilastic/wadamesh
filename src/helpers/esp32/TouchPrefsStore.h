@@ -198,10 +198,19 @@ bool    touchPrefsSetConsoleMode(bool on);
 // keyboard typing nonsense (#341, #351).
 bool    touchPrefsGetKbForceLegacy();
 bool    touchPrefsSetKbForceLegacy(bool on);
-bool    touchPrefsGetKbForceLegacy();
-bool    touchPrefsSetKbForceLegacy(bool on);
 bool    touchPrefsGetConsoleMonitor();      // console: show incoming messages live
 bool    touchPrefsSetConsoleMonitor(bool on);
+
+/** Cold-boot clock acquisition over SAVED Wi-Fi (#383, helpers/esp32/BootTimeSync.h).
+ *  Both default OFF. The first enables the bounded, power-on-only session at all;
+ *  the second additionally permits saved OPEN networks, which is a separate trust
+ *  decision and is never implied by the first. */
+bool    touchPrefsGetBootWifiTime();
+bool    touchPrefsSetBootWifiTime(bool on);
+bool    touchPrefsGetLoudAlerts();
+bool    touchPrefsSetLoudAlerts(bool on);
+bool    touchPrefsGetBootWifiTimeOpen();
+bool    touchPrefsSetBootWifiTimeOpen(bool on);
 bool    touchPrefsGetBootAdvert();
 bool    touchPrefsSetBootAdvert(bool on);
 

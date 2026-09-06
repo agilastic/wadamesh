@@ -32,6 +32,11 @@ About the map	A térképről
 Accent popups	Ékezetes felugró ablakok
 Accent popups: off	Accent popups: kikapcsolva
 Accent popups: on	Accent popups: bekapcsolva
+Accent colour	Kiemelőszín
+Appearance	Megjelenés
+Day	Nappali
+Night	Éjszakai
+Theme save failed	Téma mentése sikertelen
 Ack	Ack
 Active	Aktív
 Add	Hozzáad
@@ -447,10 +452,11 @@ Lock wallpaper set	Zárolt háttérkép beállítása
 Lock when screen off	Zárolás kikapcsolt képernyő esetén
 Locking…	Zárva…
 Locks when screen off\n(hold Backspace to unlock)	Zárol képernyőkikapcsoláskor\n(feloldás: Backspace nyomva tartása)
-Locks when screen off\n(hold the d-pad to unlock)	Kikapcsolt képernyő esetén zárol\n(a feloldáshoz tartsa lenyomva a d-padot)
+Locks when screen off\n(double-press d-pad center to unlock)	Kikapcsolt képernyő esetén zárol\n(a feloldáshoz nyomja meg kétszer a d-pad közepét)
 Locks when screen off\n(hold the trackball to unlock)	Kikapcsolt képernyő esetén zárol\n(a feloldáshoz tartsa lenyomva a görgetőgolyót)
 Locks when screen off\n(press Volume Down to unlock)	Kikapcsolt képernyő esetén zárol\n(a feloldáshoz nyomja meg a Hangerő csökkentése gombot)
 Locks when screen off\n(press the button to unlock)	Lezár, ha a képernyő ki van kapcsolva\n(a feloldáshoz nyomja meg a gombot)
+Locks when screen off\n(hold the wake button to unlock)	Lezár, ha a képernyő ki van kapcsolva\n(a feloldáshoz tartsa lenyomva az ébresztőgombot)
 Log in again	Újra bejelentkezés
 Logging in again...	Újra bejelentkezés...
 Logging in…	Bejelentkezés…
@@ -861,7 +867,6 @@ Temperature	Hőmérséklet
 Test builds: off	Tesztverziók: kikapcsolva
 Test builds: on	Tesztverziók: bekapcsolva
 Theme	Téma
-Theme colour	Téma szine
 Then pick a mode:	Majd válassz módot:
 This contact hasn't shared\na GPS position.	Ez a kapcsolat nem osztotta meg GPS-pozícióját.
 This device can run Wi-Fi and Bluetooth at once, as a standalone radio and a phone companion (MeshCore app) together.\n\nRunning both at the same time uses more RAM, so turn on only what you need.\n\nSet them up anytime in Settings.	Ez az eszköz egyszerre képes Wi-Fi-t és Bluetooth-t futtatni, önálló rádióként és telefonkiegészítőként (MeshCore alkalmazás) is.\n\nA kettő egyidejű futtatása több RAM-ot fogyaszt, ezért csak azt kapcsold be, amire szükséged van.\n\nBármikor beállíthatod őket a Beállításokban.
@@ -968,8 +973,9 @@ e.g. mesh	pl. mesh
 from	from
 h  to	ó  →
 hold Backspace to unlock	feloldás: tartsd nyomva a Backspace-t
-hold the d-pad to unlock	tartsa lenyomva a d-padot a feloldáshoz
+double-press d-pad center to unlock	a feloldáshoz nyomja meg kétszer a d-pad közepét
 hold the trackball to unlock	tartsa lenyomva a trackballt a feloldáshoz
+hold the wake button to unlock	a feloldáshoz tartsa lenyomva az ébresztőgombot
 kHz	kHz
 keep holding	tartsd ki
 last wake:	utolsó ébresztés:
@@ -1142,3 +1148,34 @@ path unknown	path unknown
 direct	direct
 hop	hop
 hops	hops
+Advertised position displaced	Advertised position displaced
+Advertising your exact position	Advertising your exact position
+Day theme - restarting to apply it…	Day theme - restarting to apply it…
+Entering remote mode - restarting…	Entering remote mode - restarting…
+Exact	Exact
+Leaving remote mode - restarting…	Leaving remote mode - restarting…
+Night theme - restarting to apply it…	Night theme - restarting to apply it…
+Position in adverts	Position in adverts
+Rotating… restarting to apply it	Rotating… restarting to apply it
+Within %u km	Within %u km
+Within %u m	Within %u m
+shifts the position others see; your own map keeps the real fix	shifts the position others see; your own map keeps the real fix
+Clock set	Clock set
+Set clock	Set clock
+Set the clock by hand (local time)	Set the clock by hand (local time)
+That is not a valid date and time	That is not a valid date and time
+Use YYYY-MM-DD HH:MM	Use YYYY-MM-DD HH:MM
+Browser connected	Browser connected
+Could not clear previous upload	Could not clear previous upload
+Could not create transfer folder	Could not create transfer folder
+File Transfer needs the SD card	File Transfer needs the SD card
+File Transfer session expired	File Transfer session expired
+File Transfer stopped: Wi-Fi disconnected	File Transfer stopped: Wi-Fi disconnected
+File Transfer: low memory	File Transfer: low memory
+Reading file list	Reading file list
+Session code	Session code
+Stop File Transfer	Stop File Transfer
+Upload files or download screenshots from a browser on the same Wi-Fi.	Upload files or download screenshots from a browser on the same Wi-Fi.
+Waiting for browser	Waiting for browser
+Download mode (wait for USB flash)	Download mode (wait for USB flash)
+Download mode… reflash over USB,\nor press RESET to cancel	Download mode… reflash over USB,\nor press RESET to cancel

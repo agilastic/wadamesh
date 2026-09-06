@@ -32,6 +32,11 @@ About the map	Acerca del mapa
 Accent popups	Ventanas de acentos
 Accent popups: off	Ventanas de acentos: desactivado
 Accent popups: on	Ventanas de acentos: activado
+Accent colour	Color de acento
+Appearance	Apariencia
+Day	Día
+Night	Noche
+Theme save failed	No se pudo guardar el tema
 Ack	Ack
 Active	Activo
 Add	Añadir
@@ -442,10 +447,11 @@ Lock wallpaper set	Fondo de bloqueo establecido
 Lock when screen off	Bloquear con pantalla apagada
 Locking…	Bloqueando…
 Locks when screen off\n(hold Backspace to unlock)	Se bloquea con la pantalla apagada\n(mantén Retroceso para desbloquear)
-Locks when screen off\n(hold the d-pad to unlock)	Se bloquea con pantalla apagada\n(mantén el d-pad para desbloquear)
+Locks when screen off\n(double-press d-pad center to unlock)	Se bloquea con pantalla apagada\n(pulsa dos veces el centro del d-pad para desbloquear)
 Locks when screen off\n(hold the trackball to unlock)	Se bloquea con pantalla apagada\n(mantén el trackball para desbloquear)
 Locks when screen off\n(press Volume Down to unlock)	Se bloquea con pantalla apagada\n(pulsa Bajar volumen para desbloquear)
 Locks when screen off\n(press the button to unlock)	Se bloquea con pantalla apagada\n(pulsa el botón para desbloquear)
+Locks when screen off\n(hold the wake button to unlock)	Se bloquea con pantalla apagada\n(mantén pulsado el botón de activación para desbloquear)
 Log in again	Iniciar sesión de nuevo
 Logging in again...	Iniciando sesión de nuevo...
 Logging in…	Iniciando sesión…
@@ -845,7 +851,6 @@ Temperature	Temperatura
 Test builds: off	Compilaciones de prueba: off
 Test builds: on	Compilaciones de prueba: on
 Theme	Tema
-Theme colour	Color del tema
 Then pick a mode:	Luego elige un modo:
 This contact hasn't shared\na GPS position.	Este contacto no ha compartido\nuna posición GPS.
 This device can run Wi-Fi and Bluetooth at once, as a standalone radio and a phone companion (MeshCore app) together.\n\nRunning both at the same time uses more RAM, so turn on only what you need.\n\nSet them up anytime in Settings.	Este dispositivo puede usar Wi-Fi y Bluetooth a la vez, como radio independiente y compañero del teléfono (app MeshCore).\n\nUsar ambos consume más RAM, así que activa solo lo que necesites.\n\nConfigúralos cuando quieras en Ajustes.
@@ -949,8 +954,9 @@ e.g. mesh	p. ej. mesh
 from	de
 h  to	h  a
 hold Backspace to unlock	mantén Retroceso para desbloquear
-hold the d-pad to unlock	mantén el d-pad para desbloquear
+double-press d-pad center to unlock	pulsa dos veces el centro del d-pad para desbloquear
 hold the trackball to unlock	mantén el trackball para desbloquear
+hold the wake button to unlock	mantén pulsado el botón de activación para desbloquear
 kHz	kHz
 keep holding	mantén pulsado
 last wake:	
@@ -1125,3 +1131,34 @@ path unknown	path unknown
 direct	direct
 hop	hop
 hops	hops
+Advertised position displaced	Advertised position displaced
+Advertising your exact position	Advertising your exact position
+Day theme - restarting to apply it…	Day theme - restarting to apply it…
+Entering remote mode - restarting…	Entering remote mode - restarting…
+Exact	Exact
+Leaving remote mode - restarting…	Leaving remote mode - restarting…
+Night theme - restarting to apply it…	Night theme - restarting to apply it…
+Position in adverts	Position in adverts
+Rotating… restarting to apply it	Rotating… restarting to apply it
+Within %u km	Within %u km
+Within %u m	Within %u m
+shifts the position others see; your own map keeps the real fix	shifts the position others see; your own map keeps the real fix
+Clock set	Clock set
+Set clock	Set clock
+Set the clock by hand (local time)	Set the clock by hand (local time)
+That is not a valid date and time	That is not a valid date and time
+Use YYYY-MM-DD HH:MM	Use YYYY-MM-DD HH:MM
+Browser connected	Browser connected
+Could not clear previous upload	Could not clear previous upload
+Could not create transfer folder	Could not create transfer folder
+File Transfer needs the SD card	File Transfer needs the SD card
+File Transfer session expired	File Transfer session expired
+File Transfer stopped: Wi-Fi disconnected	File Transfer stopped: Wi-Fi disconnected
+File Transfer: low memory	File Transfer: low memory
+Reading file list	Reading file list
+Session code	Session code
+Stop File Transfer	Stop File Transfer
+Upload files or download screenshots from a browser on the same Wi-Fi.	Upload files or download screenshots from a browser on the same Wi-Fi.
+Waiting for browser	Waiting for browser
+Download mode (wait for USB flash)	Download mode (wait for USB flash)
+Download mode… reflash over USB,\nor press RESET to cancel	Download mode… reflash over USB,\nor press RESET to cancel

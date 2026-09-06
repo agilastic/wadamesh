@@ -32,6 +32,11 @@ About the map	Sobre o mapa
 Accent popups	Pop-ups de acento
 Accent popups: off	Pop-ups de acento: desligados
 Accent popups: on	Pop-ups de acento: ligados
+Accent colour	Cor de destaque
+Appearance	Aparência
+Day	Dia
+Night	Noite
+Theme save failed	Falha ao salvar o tema
 Ack	Ack
 Active	Ativo
 Add	Adicionar
@@ -442,10 +447,11 @@ Lock wallpaper set	Papel de parede definido
 Lock when screen off	Bloquear com tela desligada
 Locking…	Bloqueando…
 Locks when screen off\n(hold Backspace to unlock)	Bloqueia com a tela desligada\n(segure Backspace para desbloquear)
-Locks when screen off\n(hold the d-pad to unlock)	Bloqueia com tela desligada\n(segure o d-pad para desbloquear)
+Locks when screen off\n(double-press d-pad center to unlock)	Bloqueia com tela desligada\n(pressione duas vezes o centro do direcional para desbloquear)
 Locks when screen off\n(hold the trackball to unlock)	Bloqueia com tela desligada\n(segure o trackball para desbloquear)
 Locks when screen off\n(press Volume Down to unlock)	Bloqueia com tela desligada\n(pressione Volume para baixo para desbloquear)
 Locks when screen off\n(press the button to unlock)	Bloqueia com tela desligada\n(pressione o botão para desbloquear)
+Locks when screen off\n(hold the wake button to unlock)	Bloqueia com tela desligada\n(segure o botão de ativação para desbloquear)
 Log in again	Entrar novamente
 Logging in again...	Entrando novamente...
 Logging in…	Entrando…
@@ -844,7 +850,6 @@ Temperature	Temperatura
 Test builds: off	Builds de teste: off
 Test builds: on	Builds de teste: on
 Theme	Tema
-Theme colour	Cor do tema
 Then pick a mode:	Depois escolha um modo:
 This contact hasn't shared\na GPS position.	Este contato não compartilhou\numa posição GPS.
 This device can run Wi-Fi and Bluetooth at once, as a standalone radio and a phone companion (MeshCore app) together.\n\nRunning both at the same time uses more RAM, so turn on only what you need.\n\nSet them up anytime in Settings.	Este aparelho pode usar Wi-Fi e Bluetooth ao mesmo tempo, como rádio autônomo e companheiro do celular (app MeshCore).\n\nUsar os dois juntos consome mais RAM, então ligue só o que precisar.\n\nConfigure quando quiser em Ajustes.
@@ -948,8 +953,9 @@ e.g. mesh	ex. mesh
 from	de
 h  to	h  até
 hold Backspace to unlock	segure Backspace para desbloquear
-hold the d-pad to unlock	segure o d-pad para desbloquear
+double-press d-pad center to unlock	pressione duas vezes o centro do direcional para desbloquear
 hold the trackball to unlock	segure o trackball para desbloquear
+hold the wake button to unlock	segure o botão de ativação para desbloquear
 kHz	kHz
 keep holding	continue segurando
 last wake:	
@@ -1124,3 +1130,34 @@ path unknown	path unknown
 direct	direct
 hop	hop
 hops	hops
+Advertised position displaced	Advertised position displaced
+Advertising your exact position	Advertising your exact position
+Day theme - restarting to apply it…	Day theme - restarting to apply it…
+Entering remote mode - restarting…	Entering remote mode - restarting…
+Exact	Exact
+Leaving remote mode - restarting…	Leaving remote mode - restarting…
+Night theme - restarting to apply it…	Night theme - restarting to apply it…
+Position in adverts	Position in adverts
+Rotating… restarting to apply it	Rotating… restarting to apply it
+Within %u km	Within %u km
+Within %u m	Within %u m
+shifts the position others see; your own map keeps the real fix	shifts the position others see; your own map keeps the real fix
+Clock set	Clock set
+Set clock	Set clock
+Set the clock by hand (local time)	Set the clock by hand (local time)
+That is not a valid date and time	That is not a valid date and time
+Use YYYY-MM-DD HH:MM	Use YYYY-MM-DD HH:MM
+Browser connected	Browser connected
+Could not clear previous upload	Could not clear previous upload
+Could not create transfer folder	Could not create transfer folder
+File Transfer needs the SD card	File Transfer needs the SD card
+File Transfer session expired	File Transfer session expired
+File Transfer stopped: Wi-Fi disconnected	File Transfer stopped: Wi-Fi disconnected
+File Transfer: low memory	File Transfer: low memory
+Reading file list	Reading file list
+Session code	Session code
+Stop File Transfer	Stop File Transfer
+Upload files or download screenshots from a browser on the same Wi-Fi.	Upload files or download screenshots from a browser on the same Wi-Fi.
+Waiting for browser	Waiting for browser
+Download mode (wait for USB flash)	Download mode (wait for USB flash)
+Download mode… reflash over USB,\nor press RESET to cancel	Download mode… reflash over USB,\nor press RESET to cancel

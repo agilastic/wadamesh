@@ -2156,44 +2156,61 @@ void loop() {
 #endif
 
 #if defined(MULTI_TRANSPORT_COMPANION) && defined(HAS_TOUCH_UI)
-  // WiFi idle-off: when the screen is off/AOD-locked AND no WiFi companion
-  // client is connected, power down WiFi after a 60-second grace period.
-  // BLE stays up so the companion app can still connect via Bluetooth.
-  // WiFi is restored the moment the screen wakes (wakeScreen triggers a
-  // wifiConfigRequestApply which the state machine above picks up next tick).
-  {
+  // Battery-saver idle radio management: when "Battery saver" is enabled in
+  // Settings → Battery, power down WiFi and BLE when the screen is dark and no
+  // companion client is connected. Both radios are restored the moment the screen
+  // wakes or a client reconnects (BLE re-enables advertising; the WiFi state
+  // machine above picks up on the next tick via last_wifi_retry_ms = 0).
+  //
+  // WiFi: disabled after a 60-second grace period (allows a brief screen-off
+  //   without immediately tearing down an active TCP/WS session).
+  // BLE:  disabled after the same grace period (BLE advertising draws ~5 mA;
+  //   on ESP32-S3 WiFi.mode(WIFI_OFF) must happen BEFORE disableBle() because
+  //   it deinits the coex controller — we handle that by only shutting BLE down
+  //   once WiFi is already off or was never on).
+  if (touchPrefsGetSleepIdle()) {
     static uint32_t s_wifi_idle_since_ms = 0;
-    constexpr uint32_t WIFI_IDLE_GRACE_MS = 60000;
+    static bool     s_ble_idled_off      = false;
+    constexpr uint32_t IDLE_GRACE_MS     = 60000;
 
-    const bool screen_idle = ui_task.isScreenOff();
+    const bool screen_idle     = ui_task.isScreenOff();
     const bool has_wifi_client = serial_interface.hasWifiCompanionClient();
+    const bool has_ble_client  = serial_interface.hasBleCompanionClient();
 
-    if (!screen_idle || has_wifi_client) {
-      // Active: cancel any pending shutdown; restore WiFi if we turned it off.
+    if (!screen_idle || has_wifi_client || has_ble_client) {
+      // Active: cancel any pending shutdown; restore radios we turned off.
       s_wifi_idle_since_ms = 0;
       if (wifi_idled_off && !wifiScanIsActive()) {
         wifi_idled_off = false;
-        // Re-arm TCP so startTcpServer() in the block above accepts connections again.
         serial_interface.enableTcp();
-        // Let the existing WiFi state machine (above, now un-gated) handle
-        // mode(STA) + begin() + SNTP on the next tick.
         last_wifi_retry_ms = 0;
         wifi_retry_interval_ms = WIFI_RETRY_INTERVAL_INIT_MS;
       }
+      if (s_ble_idled_off) {
+        s_ble_idled_off = false;
+        if (serial_interface.hasBleCapability()) serial_interface.enableBle();
+      }
     } else {
-      // Screen idle, no WiFi client.
+      // Screen idle, no companion client on either radio.
       if (s_wifi_idle_since_ms == 0) s_wifi_idle_since_ms = millis();
-      // Skip WiFi shutdown when BLE is active: WiFi.mode(WIFI_OFF) deinits the
-      // coexistence controller on ESP32-S3, silently killing BLE advertising too.
-      const bool ble_active = serial_interface.isBleEnabled();
-      if (!wifi_idled_off && wifi_started && !ble_active &&
-          (uint32_t)(millis() - s_wifi_idle_since_ms) >= WIFI_IDLE_GRACE_MS) {
-        wifi_idled_off = true;
-        serial_interface.stopTcpServer();   // drops all TCP/WS clients + sets _tcp_enabled=false
-        WiFi.disconnect(true);
-        delay(50);
-        WiFi.mode(WIFI_OFF);
-        wifi_started = false;
+      const uint32_t idle_ms = (uint32_t)(millis() - s_wifi_idle_since_ms);
+      if (idle_ms >= IDLE_GRACE_MS) {
+        // WiFi first: WiFi.mode(WIFI_OFF) must precede BLE disable on ESP32-S3
+        // because it tears down the coex controller (would silently kill BLE too).
+        if (!wifi_idled_off && wifi_started) {
+          wifi_idled_off = true;
+          serial_interface.stopTcpServer();
+          WiFi.disconnect(true);
+          delay(50);
+          WiFi.mode(WIFI_OFF);
+          wifi_started = false;
+        }
+        // BLE: only after WiFi is already off (or was never started).
+        if (!s_ble_idled_off && !wifi_started &&
+            serial_interface.hasBleCapability() && serial_interface.isBleEnabled()) {
+          s_ble_idled_off = true;
+          serial_interface.disableBle();
+        }
       }
     }
   }

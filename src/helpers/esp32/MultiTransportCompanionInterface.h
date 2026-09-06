@@ -59,6 +59,10 @@ public:
   bool hasBleCapability() const override { return true; }
 #endif
   bool getBlePeerAddress(char* buf, size_t len) const override;
+  /** True if a BLE companion client is currently connected. */
+  bool hasBleCompanionClient() const { return _ble_begun && _ble_enabled && _ble.isConnected(); }
+#else
+  bool hasBleCompanionClient() const { return false; }
 #endif
 
   void enableTcp() override;

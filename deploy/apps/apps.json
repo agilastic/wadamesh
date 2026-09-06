@@ -13,27 +13,15 @@
       "desc": "Utilization bars with a % axis, rx/tx split, duty ceiling, budget. Reset button top-right."
     },
     {
-      "id": "snake",
-      "name": "Snake",
-      "ver": "1.0",
-      "desc": "The classic, in Lua. Swipe to steer."
-    },
-    {
       "id": "sdktest",
       "name": "SDK Test",
       "ver": "1.7",
       "desc": "Developer tool. Checks the extended Lua SDK on this board: capabilities, clock, battery, GPS, private file access, audio API, read-only SD listing, crypto against published RFC vectors, channel discovery, and buttons that TRANSMIT test messages."
     },
     {
-      "id": "2048",
-      "name": "2048",
-      "ver": "1.2",
-      "desc": "The classic sliding-tile puzzle. Swipe to move, tap to restart. Keeps your best score. Contributed by pisti87."
-    },
-    {
       "id": "wardrive",
       "name": "Wardrive",
-      "ver": "1.1",
+      "ver": "1.1.1",
       "desc": "LoRa coverage survey. Probes every 20s and logs each reply with GPS position, altitude and BOTH link directions (how well you heard them, how well they heard you) to a CSV. Reference app for wada.mesh.discover.",
       "requires": "sdk_ext"
     },
@@ -50,12 +38,6 @@
       "ver": "1.0",
       "desc": "Compass rose: magnetometer or GPS course, live fix, bearing to contacts",
       "seed": false
-    },
-    {
-      "id": "helloworld",
-      "name": "Hello World",
-      "ver": "1.0",
-      "desc": "Minimal test app — verifies the Lua app host is working on this board."
     }
   ]
 }

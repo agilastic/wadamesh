@@ -1481,12 +1481,26 @@ local SWEEP_MS = 20000        -- above the 15 s floor the firmware enforces on p
 local HARVEST_MS = 4000       -- replies land over the few seconds after a probe
 local TYPE = { [1]="chat", [2]="repeater", [3]="room", [4]="sensor" }
 
-local run, running, samples, sweeps, last_err = "run", false, 0, 0, nil
+local run, running, samples, sweeps, last_err = "wd", false, 0, 0, nil
 local node_count = 0
 local phase, phase_at = "idle", 0
 local hdr, gps_lbl, stat_lbl, rows = nil, nil, nil, {}
 local nodes = {}              -- pubkey -> { name, type, best, worst, seen }
 local pending = {}            -- lines waiting on the 1 write/sec limit
+
+-- Generate a timestamped default run name so each session gets its own file.
+-- Falls back to wd_<epoch> when the clock is not yet set, and to plain "wd"
+-- if neither is available (no GPS/NTP yet at all).
+local function default_run_name()
+  local dt = sys.datetime and sys.datetime()
+  if dt then
+    return string.format("wd_%04d%02d%02d_%02d%02d%02d",
+      dt.year, dt.month, dt.day, dt.hour, dt.min, dt.sec)
+  end
+  local ep = sys.epoch and sys.epoch()
+  if ep then return string.format("wd_%d", ep) end
+  return "wd"
+end
 
 local function logname() return run .. ".csv" end
 
@@ -1614,6 +1628,7 @@ function app.on_open(w, h)
     ui.label("so it cannot send discovery probes.", 6, 26, 12, C.bad)
     return
   end
+  run = default_run_name()   -- unique per session; user can rename via the Name button
   ui.scroll(true)
   local LH = ui.text_h(12)
   local y = 4
@@ -1846,7 +1861,7 @@ static const LuaBuiltinApp kLuaBuiltin[] = {
   { "snake", "Snake", "1.0", kLuaSrc_snake },
   { "sdktest", "SDK Test", "1.7", kLuaSrc_sdktest },
   { "2048", "2048", "1.2", kLuaSrc_2048 },
-  { "wardrive", "Wardrive", "1.1", kLuaSrc_wardrive },
+  { "wardrive", "Wardrive", "1.1.1", kLuaSrc_wardrive },
   { "nearby", "Nearby", "1.0", kLuaSrc_nearby },
   { "helloworld", "Hello World", "1.0", kLuaSrc_helloworld },
 };

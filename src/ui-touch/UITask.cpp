@@ -57487,3 +57487,8 @@ static bool popupRegistryBlocksSwipe() {
 #if defined(ESP32)
 volatile uint8_t g_wifi_last_disc_reason = 0;
 #endif
+
+lv_coord_t luaHostAppBarH() { return statusBarCurH(); }
+
+uint32_t luaHostLastSentFp() { return the_mesh.uiLastSentFp(); }
+uint8_t  luaHostRepeatsForFp(uint32_t fp) { return fp ? the_mesh.uiRepeatsForFp(fp) : 0; }

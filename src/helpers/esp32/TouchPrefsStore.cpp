@@ -2399,4 +2399,25 @@ bool touchPrefsSetGpsBaud(uint32_t baud) {
   return cfgFlush();
 }
 
+// touchPrefsGetThemeMode / touchPrefsSetThemeMode: bridge to the existing
+// ui_theme NVS key (0=Night, non-zero=Day) so upstream callers compile cleanly.
+uint8_t touchPrefsGetThemeMode() {
+  return touchPrefsGetUiTheme() == 0 ? TOUCH_THEME_NIGHT : TOUCH_THEME_DAY;
+}
+bool touchPrefsSetThemeMode(uint8_t mode) {
+  touchPrefsSetUiTheme(mode == TOUCH_THEME_DAY ? 1 : 0);
+  return true;
+}
+
+// GPS position fuzz (metres). Stored as a standalone NVS key; 0 = disabled.
+uint16_t touchPrefsGetGpsFuzzM() {
+  if (!s_begun) touchPrefsBegin();
+  return (uint16_t)s_prefs.getUShort("gps_fuzz_m", 0);
+}
+bool touchPrefsSetGpsFuzzM(uint16_t m) {
+  if (!s_begun) touchPrefsBegin();
+  prefsPutUShort("gps_fuzz_m", m);
+  return true;
+}
+
 #endif

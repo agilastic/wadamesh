@@ -510,6 +510,11 @@ uint8_t touchPrefsGetDayTheme();               // v61: theme index used during d
 void    touchPrefsSetDayTheme(uint8_t t);
 bool    touchPrefsGetAutoAodSun();             // v58: auto AOD brightness 6% night / 15% day (live)
 void    touchPrefsSetAutoAodSun(bool on);
+/** Last GPS position used for sun evaluation (degrees × 1e6). Saved by the
+ *  sun tick so boot-time sunEvaluate can use a cached fix when GPS isn't live yet. */
+int32_t touchPrefsGetSunLat();   // 0 = never saved
+int32_t touchPrefsGetSunLon();
+void    touchPrefsSetSunPos(int32_t lat_e6, int32_t lon_e6);
 
 /** Per-channel mute, keyed by channel name. Bit 0 = mute messages, bit 1 =
  *  mute @-mentions. Suppresses the notification SOUND for that channel (the

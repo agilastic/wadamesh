@@ -550,7 +550,7 @@ static void applyUiTheme(uint8_t id) {
 
 // ---- Sun state (day/night) --------------------------------------------------
 // Evaluated at boot and every SUN_EVAL_INTERVAL_MS while awake.
-// s_sun_is_night drives auto-AOD brightness live; auto-theme is boot-only.
+// s_sun_is_night drives auto-AOD brightness and auto-theme live (no restart).
 static constexpr uint32_t SUN_EVAL_INTERVAL_MS = 10UL * 60UL * 1000UL;  // 10 min
 static constexpr int      SUN_HYSTERESIS_MIN    = 10;                     // ±10 min
 static bool     s_sun_is_night     = false;   // current day/night state
@@ -5344,9 +5344,7 @@ static void chatVirtJumpToLatest(LvChatPanel* p);
 static void chatVirtScheduleRender(LvChatPanel* p);
 static void chatVirtApplyPendingScroll(LvChatPanel* p);
 static void refreshChatList(LvChatPanel& p);
-static void applyAccent(uint32_t rgb);            // theme accent (Settings -> Theme colour)
-static void openAccentPicker();
-static void openAccentPickerCb(lv_event_t* e);
+static void applyAccent(uint32_t rgb);
 static void openChannelScopeModal(int slot, const char* name);  // per-channel region scope
 static void channelGearCb(lv_event_t* e);
 static bool chanScopeIsOpen();   // fwd: the status-bar back chevron closes the channel-settings sheet
@@ -6589,7 +6587,7 @@ static void kbMirrorEnsureCreated() {
   lv_obj_align(s_kb_mirror_ta, LV_ALIGN_BOTTOM_LEFT, 0, 0);
   lv_textarea_set_one_line(s_kb_mirror_ta, true);
   lv_obj_set_style_bg_color(s_kb_mirror_ta, lv_color_hex(0x0A0B0C), LV_PART_MAIN);
-  lv_obj_set_style_text_color(s_kb_mirror_ta, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+
   lv_obj_set_style_border_color(s_kb_mirror_ta, lv_color_hex(COLOR_BORDER), LV_PART_MAIN);
   lv_obj_set_style_border_width(s_kb_mirror_ta, 1, LV_PART_MAIN);
   lv_obj_set_style_text_font(s_kb_mirror_ta, &g_font_14, LV_PART_MAIN);
@@ -11752,7 +11750,7 @@ static void buildQuickReplySettings() {
     lv_textarea_set_one_line(ta, true);
     lv_textarea_set_max_length(ta, TOUCH_QUICK_REPLY_MAXLEN - 1);
     lv_textarea_set_text(ta, buf);
-    lv_obj_set_style_text_color(ta, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+
     lv_obj_set_style_text_font(ta, &g_font_12, LV_PART_MAIN);
     // Bind tap -> keyboard mirror exactly like every other settings field.
     // (The old composerFocusCb path is a chat-composer callback that no-ops
@@ -13714,21 +13712,21 @@ static void buildDeviceSettings(int sec) {
     lv_obj_set_height(row_day, SC(18) + SC(44));
     const int day_row_h = SC(18) + SC(44) + 4;
 
-    // Single theme dropdown (only when auto is off)
+    // Single theme dropdown (only when auto is off) — uses the Day theme pref
     lv_obj_t* row_manual = lv_obj_create(body);
     lv_obj_remove_style_all(row_manual);
     lv_obj_set_size(row_manual, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_pos(row_manual, 0, y);
     if (auto_on) lv_obj_add_flag(row_manual, LV_OBJ_FLAG_HIDDEN);
-    settingsRowLabel(row_manual, 0, 0, TR("Colour theme (restart to apply)"), COLOR_SUB, &g_font_12, 0);
+    settingsRowLabel(row_manual, 0, 0, TR("Theme (restart to apply)"), COLOR_SUB, &g_font_12, 0);
     lv_obj_t* dd_manual = lv_dropdown_create(row_manual);
     lv_dropdown_set_options(dd_manual, TR(THEME_OPTS));
-    lv_dropdown_set_selected(dd_manual, touchPrefsGetUiTheme());
+    lv_dropdown_set_selected(dd_manual, touchPrefsGetDayTheme());
     lv_obj_set_width(dd_manual, lv_pct(100));
     lv_obj_set_pos(dd_manual, 2, SC(18));
     lv_obj_add_event_cb(dd_manual, [](lv_event_t* e) {
       if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
-      touchPrefsSetUiTheme((uint8_t)lv_dropdown_get_selected(lv_event_get_target(e)));
+      touchPrefsSetDayTheme((uint8_t)lv_dropdown_get_selected(lv_event_get_target(e)));
       if (g_lv.task) g_lv.task->showAlert(TR("Theme saved — restart to apply"), 2000);
     }, LV_EVENT_VALUE_CHANGED, nullptr);
     lv_obj_add_event_cb(dd_manual, clampDropdownListCb, LV_EVENT_CLICKED, nullptr);
@@ -13745,28 +13743,6 @@ static void buildDeviceSettings(int sec) {
     y += auto_on ? (night_row_h + day_row_h) : manual_row_h;
   }
 
-  /* Theme colour (UI accent): opens a colour-wheel + hex picker. The chosen
-     colour is clamped dark enough that off-white button text stays readable. */
-  {
-    y += settingsRowLabel(body, y, 0, TR("Theme colour"), COLOR_SUB, &g_font_12, 0) + 4;
-    lv_obj_t* b = lv_btn_create(body);
-    lv_obj_set_size(b, SC(150), SC(32));
-    lv_obj_set_pos(b, 2, y);
-    styleButton(b);
-    lv_obj_add_event_cb(b, openAccentPickerCb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_t* bl = lv_label_create(b);
-    useChainedFont(bl);
-    lv_label_set_text(bl, TR("Pick colour"));
-    lv_obj_center(bl);
-    lv_obj_t* swatch = lv_obj_create(body);
-    lv_obj_remove_style_all(swatch);
-    lv_obj_set_size(swatch, SC(30), SC(30));
-    lv_obj_set_pos(swatch, 162, y + 1);
-    lv_obj_set_style_radius(swatch, 6, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(swatch, lv_color_hex(COLOR_ACCENT), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(swatch, LV_OPA_COVER, LV_PART_MAIN);
-    y += SC(40);
-  }
 
   }
 
@@ -14346,7 +14322,7 @@ static void buildDeviceSettings(int sec) {
     lv_textarea_set_password_mode(pin_ta, true);
     lv_textarea_set_placeholder_text(pin_ta, TR("Enter PIN (blank = disabled)"));
     lv_textarea_set_text(pin_ta, cur_pin);
-    lv_obj_set_style_text_color(pin_ta, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+
     lv_obj_set_style_border_color(pin_ta, lv_color_hex(COLOR_ACCENT), LV_PART_MAIN | LV_STATE_FOCUSED);
     lv_obj_add_event_cb(pin_ta, [](lv_event_t* e) {
       if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
@@ -16438,7 +16414,7 @@ static void openContactsSearchSheetCb(lv_event_t* e) {
   lv_textarea_set_max_length(s_contacts_search_ta, (uint32_t)(sizeof(g_lv.contacts_search) - 1));
   taSetPlaceholder(s_contacts_search_ta, TR("Name fragment"));
   lv_textarea_set_text(s_contacts_search_ta, g_lv.contacts_search);
-  lv_obj_set_style_text_color(s_contacts_search_ta, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+
   lv_obj_set_style_text_font(s_contacts_search_ta, &g_font_14, LV_PART_MAIN);
   // attachSettingsTaEvents binds the global keyboard mirror (via
   // kbMirrorBind) on FOCUSED / CLICKED / PRESSED. composerFocusCb (used by
@@ -17098,7 +17074,7 @@ static void openAdminConsole(const ContactInfo& c) {
   lv_textarea_set_one_line(s_admin_cmd_ta, true);
   lv_textarea_set_max_length(s_admin_cmd_ta, 64);
   taSetPlaceholder(s_admin_cmd_ta, TR("command"));
-  lv_obj_set_style_text_color(s_admin_cmd_ta, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+
   lv_obj_set_style_text_font(s_admin_cmd_ta, &g_font_14, LV_PART_MAIN);
   attachSettingsTaEvents(s_admin_cmd_ta);
 
@@ -17288,7 +17264,7 @@ static void openAdminLoginPrompt(const ContactInfo& c) {
   lv_textarea_set_password_mode(s_admin_pw_ta, true);
   lv_textarea_set_max_length(s_admin_pw_ta, 15);
   taSetPlaceholder(s_admin_pw_ta, "");
-  lv_obj_set_style_text_color(s_admin_pw_ta, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+
   lv_obj_set_style_text_font(s_admin_pw_ta, &g_font_14, LV_PART_MAIN);
   attachSettingsTaEvents(s_admin_pw_ta);
 
@@ -22698,7 +22674,7 @@ static void fmToggleSearch() {
   taSetPlaceholder(s_fm_search_ta, TR("search"));
   lv_textarea_set_max_length(s_fm_search_ta, sizeof(s_fm_filter) - 1);
   lv_obj_set_style_text_font(s_fm_search_ta, &g_font_12, LV_PART_MAIN);
-  lv_obj_set_style_text_color(s_fm_search_ta, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+
   lv_obj_set_style_pad_ver(s_fm_search_ta, 2, LV_PART_MAIN);
   lv_obj_add_event_cb(s_fm_search_ta, fmSearchChangedCb, LV_EVENT_VALUE_CHANGED, nullptr);
   attachSettingsTaEvents(s_fm_search_ta);
@@ -38298,7 +38274,9 @@ static void lockscreenPinShow() {
   lv_textarea_set_password_mode(s_lock_pin_ta, true);
   lv_textarea_set_placeholder_text(s_lock_pin_ta, "PIN");
   lv_textarea_set_text(s_lock_pin_ta, "");
-  lv_obj_set_style_text_color(s_lock_pin_ta, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(s_lock_pin_ta, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(s_lock_pin_ta, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_text_color(s_lock_pin_ta, lv_color_hex(0x111111), LV_PART_MAIN);
   lv_obj_set_style_border_color(s_lock_pin_ta, lv_color_hex(COLOR_ACCENT), LV_PART_MAIN | LV_STATE_FOCUSED);
   lv_obj_add_flag(s_lock_pin_ta, NAV_SKIP_FLAG);   // keyboard-nav skips this (touch/hardware key feeds it directly)
 
@@ -41005,7 +40983,8 @@ static void ccGpsNoneCb(lv_event_t* e) {
 static void ccThemeCb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
   closeControlCenter();
-  openAccentPicker();
+  closeAppDrawerSync();   // drawer lives on lv_layer_top; settings sheet on lv_scr_act — drawer paints over it
+  openSettingsCategory(CAT_DISPLAY);
 }
 
 #if defined(HAS_THINKNODE_M9) || defined(TLORA_PAGER)
@@ -46228,199 +46207,18 @@ static void touchThemeApplyCb(lv_theme_t* /*th*/, lv_obj_t* obj) {
     lv_obj_set_style_bg_color(obj, lv_color_hex(COLOR_ACCENT),
                               LV_PART_INDICATOR | LV_STATE_CHECKED);
   }
+  if (lv_obj_check_type(obj, &lv_textarea_class)) {
+    // Force high-contrast input fields regardless of theme: white bg, near-black text.
+    // The LVGL default theme uses its own bg/text colours which become unreadable in
+    // dark themes. Individual overrides on specific textareas (e.g. the lock PIN) take
+    // precedence over this because they are applied after creation.
+    lv_obj_set_style_bg_color(obj, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_text_color(obj, lv_color_hex(0x111111), LV_PART_MAIN);
+  }
 }
 static lv_theme_t s_touch_theme;   // our wrapper theme (parent = stock default)
 
-// Curated accent palette for the swatch grid: WADAMESH brand teal (default,
-// the logo dots) first, then stock grey + a colour spread.
-static const uint32_t kThemeColors[] = {
-  0x15B6A6, 0x57585A, 0x3B82F6, 0x2DA8A0, 0x3FA34D, 0x8B5CF6,
-  0xD2569E, 0xD0524A, 0xE0823C, 0xC8A030, 0x5B6BD0, 0xA85AB0,
-};
-
-static lv_obj_t* s_accent_picker  = nullptr;
-static lv_obj_t* s_accent_hex_ta  = nullptr;
-static lv_obj_t* s_accent_preview = nullptr;
-static uint32_t  s_accent_sel     = 0x15B6A6u;   // currently-selected colour (default: brand teal)
-static bool      s_accent_syncing = false;
-
-static void accentPreviewShow(uint32_t rgb) {
-  if (s_accent_preview)
-    lv_obj_set_style_bg_color(s_accent_preview, lv_color_hex(accentClampReadable(rgb)), LV_PART_MAIN);
-}
-// "RRGGBB" -> rgb, or 0xFFFFFFFF if not exactly 6 hex digits.
-static uint32_t accentParseHex(const char* t) {
-  uint32_t rgb = 0; int n = 0;
-  for (const char* p = t; *p; ++p) {
-    int v; char ch = *p;
-    if      (ch>='0'&&ch<='9') v = ch-'0';
-    else if (ch>='a'&&ch<='f') v = ch-'a'+10;
-    else if (ch>='A'&&ch<='F') v = ch-'A'+10;
-    else return 0xFFFFFFFFu;
-    rgb = (rgb<<4)|v; n++;
-  }
-  return (n == 6) ? (rgb & 0xFFFFFFu) : 0xFFFFFFFFu;
-}
-static void accentSetSelection(uint32_t rgb, bool update_hex) {
-  s_accent_sel = rgb & 0xFFFFFFu;
-  accentPreviewShow(s_accent_sel);
-  if (update_hex && s_accent_hex_ta) {
-    s_accent_syncing = true;
-    char hx[8]; snprintf(hx, sizeof hx, "%06X", (unsigned)s_accent_sel);
-    lv_textarea_set_text(s_accent_hex_ta, hx);
-    s_accent_syncing = false;
-  }
-}
-static void accentSwatchCb(lv_event_t* e) {
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-    accentSetSelection((uint32_t)(uintptr_t)lv_event_get_user_data(e), true);
-}
-static void accentHexCb(lv_event_t* e) {
-  if (s_accent_syncing || !s_accent_hex_ta) return;
-  uint32_t rgb = accentParseHex(lv_textarea_get_text(s_accent_hex_ta));
-  if (rgb != 0xFFFFFFFFu) accentSetSelection(rgb, false);  // don't fight the typist
-}
-static void accentPickerClose() {
-  if (s_accent_picker) { popupClose(&s_accent_picker); }
-  s_accent_hex_ta = s_accent_preview = nullptr;
-}
-static void accentPickerCloseCb(lv_event_t* e) {
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED) accentPickerClose();
-}
-static void accentSaveCb(lv_event_t* e) {
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-  applyAccent(s_accent_sel);
-#if defined(ESP32)
-  touchPrefsSetAccentColor(s_accent_sel);
-#endif
-  accentPickerClose();
-  // The accent is read by every widget as it's built, so restart to recolour the
-  // whole UI in one go (the button says "Save & restart").
-  if (g_lv.task) g_lv.task->rebootDevice();   // saves chat history first
-}
-static void accentResetCb(lv_event_t* e) {
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED) accentSetSelection(0x15B6A6u, true);
-}
-static void openAccentPicker() {
-  accentPickerClose();
-  const lv_coord_t sw = lv_disp_get_hor_res(nullptr);
-  const lv_coord_t sh = lv_disp_get_ver_res(nullptr);
-  s_accent_picker = lv_obj_create(lv_layer_top());
-  lv_obj_remove_style_all(s_accent_picker);
-  lv_obj_set_size(s_accent_picker, sw, sh - STATUSBAR_H);
-  lv_obj_set_pos(s_accent_picker, 0, STATUSBAR_H);
-  lv_obj_set_style_bg_color(s_accent_picker, lv_color_hex(COLOR_BG), LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(s_accent_picker, LV_OPA_COVER, LV_PART_MAIN);
-  lv_obj_set_flex_flow(s_accent_picker, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(s_accent_picker, LV_FLEX_ALIGN_START,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_row(s_accent_picker, 4, LV_PART_MAIN);
-  lv_obj_set_style_pad_top(s_accent_picker, 3, LV_PART_MAIN);
-  lv_obj_set_scroll_dir(s_accent_picker, LV_DIR_VER);
-
-  lv_obj_t* title = lv_label_create(s_accent_picker);
-  lv_label_set_text(title, TR("Theme colour"));
-  lv_obj_set_style_text_font(title, &g_font_16, LV_PART_MAIN);
-  lv_obj_set_style_text_color(title, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
-
-  lv_obj_t* close = lv_btn_create(s_accent_picker);
-  lv_obj_add_flag(close, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  lv_obj_set_size(close, 30, 26);
-  lv_obj_align(close, LV_ALIGN_TOP_RIGHT, -6, 2);
-  styleButton(close);
-  lv_obj_add_event_cb(close, accentPickerCloseCb, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* cl = lv_label_create(close); lv_label_set_text(cl, LV_SYMBOL_CLOSE); tanCloseRed(cl);
-  lv_obj_set_style_text_font(cl, &g_font_12, LV_PART_MAIN); lv_obj_center(cl);
-
-  // Swatch grid: tap a colour (far friendlier on a touchscreen than a wheel).
-  lv_obj_t* grid = lv_obj_create(s_accent_picker);
-  lv_obj_remove_style_all(grid);
-  lv_obj_set_size(grid, sw - 24, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
-  lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_row(grid, 8, LV_PART_MAIN);
-  lv_obj_set_style_pad_column(grid, 8, LV_PART_MAIN);
-  lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
-  for (int i = 0; i < (int)(sizeof(kThemeColors)/sizeof(kThemeColors[0])); ++i) {
-    lv_obj_t* sb = lv_btn_create(grid);
-    lv_obj_set_size(sb, 28, 28);
-    lv_obj_set_style_radius(sb, 7, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(sb, lv_color_hex(kThemeColors[i]), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(sb, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(sb, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(sb, lv_color_hex(0x202224), LV_PART_MAIN);
-    lv_obj_add_event_cb(sb, accentSwatchCb, LV_EVENT_CLICKED, (void*)(uintptr_t)kThemeColors[i]);
-  }
-
-  lv_obj_t* hexrow = lv_obj_create(s_accent_picker);
-  lv_obj_remove_style_all(hexrow);
-  lv_obj_set_size(hexrow, 150, 30);
-  lv_obj_t* hash = lv_label_create(hexrow);
-  useChainedFont(hash);
-  lv_label_set_text(hash, "#");
-  lv_obj_set_style_text_color(hash, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
-  lv_obj_align(hash, LV_ALIGN_LEFT_MID, 2, 0);
-  s_accent_hex_ta = lv_textarea_create(hexrow);
-  lv_textarea_set_one_line(s_accent_hex_ta, true);
-  lv_textarea_set_max_length(s_accent_hex_ta, 6);
-  lv_textarea_set_accepted_chars(s_accent_hex_ta, "0123456789abcdefABCDEF");
-  lv_obj_set_size(s_accent_hex_ta, 120, 28);
-  lv_obj_align(s_accent_hex_ta, LV_ALIGN_LEFT_MID, 16, 0);
-  lv_obj_add_event_cb(s_accent_hex_ta, accentHexCb, LV_EVENT_VALUE_CHANGED, nullptr);
-  attachSettingsTaEvents(s_accent_hex_ta);
-
-  s_accent_preview = lv_obj_create(s_accent_picker);
-  lv_obj_remove_style_all(s_accent_preview);
-  lv_obj_set_size(s_accent_preview, 150, 28);
-  lv_obj_set_style_radius(s_accent_preview, 6, LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(s_accent_preview, LV_OPA_COVER, LV_PART_MAIN);
-  lv_obj_t* pv = lv_label_create(s_accent_preview);
-  useChainedFont(pv);
-  lv_label_set_text(pv, TR("Sample text"));
-  lv_obj_set_style_text_color(pv, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
-  lv_obj_center(pv);
-
-  // Buttons size to their label instead of to 124/84 px. Those numbers were
-  // measured against "Save & restart" / "Reset"; Hungarian's
-  // "Mentés és újraindítás" is half again as long and ran off both edges of its
-  // button (#307). A wrapping row means an over-long pair drops onto two lines
-  // rather than clipping, and the picker is a scrollable flex column so the
-  // extra height costs nothing. max_width keeps a single very long label inside
-  // the card instead of pushing the row wider than the screen.
-  lv_obj_t* btnrow = lv_obj_create(s_accent_picker);
-  lv_obj_remove_style_all(btnrow);
-  lv_obj_set_width(btnrow, sw - 24);
-  lv_obj_set_height(btnrow, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(btnrow, LV_FLEX_FLOW_ROW_WRAP);
-  lv_obj_set_flex_align(btnrow, LV_FLEX_ALIGN_SPACE_BETWEEN,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_column(btnrow, 8, LV_PART_MAIN);
-  lv_obj_set_style_pad_row(btnrow, 6, LV_PART_MAIN);
-  lv_obj_clear_flag(btnrow, LV_OBJ_FLAG_SCROLLABLE);
-
-  auto sized_btn = [&](lv_event_cb_t cb) {
-    lv_obj_t* b = lv_btn_create(btnrow);
-    lv_obj_set_size(b, LV_SIZE_CONTENT, 30);
-    lv_obj_set_style_max_width(b, LV_PCT(100), LV_PART_MAIN);
-    lv_obj_set_style_pad_hor(b, 12, LV_PART_MAIN);
-    styleButton(b);
-    lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
-    return b;
-  };
-  lv_obj_t* save = sized_btn(accentSaveCb);
-  lv_obj_t* sl = lv_label_create(save); lv_label_set_text(sl, TR("Save & restart"));
-  lv_obj_set_style_text_font(sl, &g_font_12, LV_PART_MAIN); lv_obj_center(sl);
-  useChainedFont(sl);
-  lv_obj_t* rst = sized_btn(accentResetCb);
-  lv_obj_t* rl = lv_label_create(rst); lv_label_set_text(rl, TR("Reset"));
-  lv_obj_set_style_text_font(rl, &g_font_12, LV_PART_MAIN); lv_obj_center(rl);
-  useChainedFont(rl);
-
-  accentSetSelection(touchPrefsGetAccentColor(), true);
-}
-static void openAccentPickerCb(lv_event_t* e) {
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED) openAccentPicker();
-}
 
 // ============================================================
 // Per-channel region scope (status-bar gear -> this modal)
@@ -47387,23 +47185,42 @@ static void buildUiTree() {
   }
 #endif
 
-  // Sun-driven auto theme: evaluate once at boot so the chosen theme is known
-  // before the widget tree is built. Theme change requires a restart anyway,
-  // so boot-time evaluation is both correct and sufficient.
-  // Theme 0 = Dark (night), Theme 1 = Light (day).
-  if ((touchPrefsGetAutoThemeSun() || touchPrefsGetAutoAodSun()) && g_lv.task) {
-    float tz_h = (float)touchPrefsGetTimeOffsetHours();   // hours, user's UTC offset
-    sunEvaluate(g_lv.task->getNodeLat(), g_lv.task->getNodeLon(), tz_h);
-    s_sun_last_eval_ms = millis();
-    if (s_sun_valid && touchPrefsGetAutoThemeSun()) {
-      const uint8_t sun_theme = s_sun_is_night ? touchPrefsGetNightTheme() : touchPrefsGetDayTheme();
-      if (touchPrefsGetUiTheme() != sun_theme) touchPrefsSetUiTheme(sun_theme);
+  // Sun-driven auto theme: evaluate at boot so the correct theme is applied
+  // before the widget tree is built. Theme 0 = Dark (night), Theme 1 = Light (day).
+  // When auto-sun is on, start from UiTheme (last value the tick wrote) so a
+  // failed sunEvaluate at boot (no clock / no position) keeps the previous session's
+  // correct theme rather than resetting to DayTheme.
+  uint8_t boot_theme = touchPrefsGetAutoThemeSun()
+                       ? touchPrefsGetUiTheme()
+                       : touchPrefsGetDayTheme();
+  if (touchPrefsGetAutoThemeSun() && g_lv.task) {
+    float tz_h = (float)touchPrefsGetTimeOffsetHours();
+    double boot_lat = g_lv.task->getNodeLat(), boot_lon = g_lv.task->getNodeLon();
+    // loadPrefs populates node_lat/lon from saved prefs, but if it's still zero
+    // (e.g. position never saved) fall back to our own last-saved sun position.
+    if (boot_lat == 0.0 && boot_lon == 0.0) {
+      boot_lat = touchPrefsGetSunLat() / 1.0e6;
+      boot_lon = touchPrefsGetSunLon() / 1.0e6;
     }
+    sunEvaluate(boot_lat, boot_lon, tz_h);
+    s_sun_last_eval_ms = millis();
+    if (s_sun_valid)
+      boot_theme = s_sun_is_night ? touchPrefsGetNightTheme() : touchPrefsGetDayTheme();
+    // else: sunEvaluate failed (no clock/position) — keep UiTheme from last session
+  } else if (touchPrefsGetAutoAodSun() && g_lv.task) {
+    // AOD-only sun mode: still need to seed s_sun_is_night / s_sun_valid for the AOD path.
+    double boot_lat = g_lv.task->getNodeLat(), boot_lon = g_lv.task->getNodeLon();
+    if (boot_lat == 0.0 && boot_lon == 0.0) {
+      boot_lat = touchPrefsGetSunLat() / 1.0e6;
+      boot_lon = touchPrefsGetSunLon() / 1.0e6;
+    }
+    sunEvaluate(boot_lat, boot_lon, (float)touchPrefsGetTimeOffsetHours());
+    s_sun_last_eval_ms = millis();
   }
 
   // Apply the colour theme first (sets BG/TEXT/PANEL/… globals and the
   // theme-default accent), then load any user-customised accent on top.
-  applyUiTheme(touchPrefsGetUiTheme());
+  applyUiTheme(boot_theme);
   applyAccent(touchPrefsGetAccentColor());
 
   lv_obj_t* root = lv_scr_act();
@@ -53583,8 +53400,8 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
     // tdeckPlayNotify — so nothing to set up at boot.)
 
     // Apply colour theme + accent BEFORE the status bar is built.
-    // Idempotent: buildUiTree's own call just re-sets the same globals.
-    applyUiTheme(touchPrefsGetUiTheme());
+    // Idempotent: buildUiTree's own call re-sets the same globals with full sun evaluation.
+    applyUiTheme(touchPrefsGetDayTheme());   // preliminary; buildUiTree corrects with sun eval
     applyAccent(touchPrefsGetAccentColor());
 
     // Build the always-on top status bar AFTER the display driver is
@@ -56419,14 +56236,33 @@ void UITask::loop() {
       sunEvaluate(_sensors->node_lat, _sensors->node_lon,
                   (float)touchPrefsGetTimeOffsetHours());
       s_sun_last_eval_ms = now;
+      // Persist position so next boot can evaluate sun without waiting for GPS.
+      if (s_sun_valid && (_sensors->node_lat != 0.0 || _sensors->node_lon != 0.0))
+        touchPrefsSetSunPos((int32_t)(_sensors->node_lat * 1e6), (int32_t)(_sensors->node_lon * 1e6));
       if (s_sun_valid && touchPrefsGetAutoThemeSun()) {
         const uint8_t sun_theme = s_sun_is_night ? touchPrefsGetNightTheme() : touchPrefsGetDayTheme();
         if (touchPrefsGetUiTheme() != sun_theme) {
           touchPrefsSetUiTheme(sun_theme);
-          showAlert(TR("Theme changed — restarting…"), 2000);
-          lv_refr_now(nullptr);
-          delay(2000);
-          ESP.restart();
+          applyUiTheme(sun_theme);
+          applyAccent(touchPrefsGetAccentColor());
+          // Re-style persistent widgets that are built once and never torn down.
+          // Transient overlays (CC, settings sheets, popups) pick up new colors
+          // when next opened. Persistent tab content updates on next tab switch.
+          lv_obj_t* scr = lv_scr_act();
+          lv_obj_set_style_bg_color(scr, lv_color_hex(COLOR_BG), LV_PART_MAIN);
+          if (g_lv.tabview) {
+            lv_obj_t* tbar = lv_tabview_get_tab_btns(g_lv.tabview);
+            if (tbar) lv_obj_set_style_bg_color(tbar, lv_color_hex(COLOR_PANEL), LV_PART_MAIN);
+          }
+          // Rebuild the global status bar — it's a small self-contained widget
+          // tree on lv_layer_top with no persistent session state, so delete +
+          // recreate is cleaner than re-walking every child's baked-in color.
+          if (g_statusbar.root && lv_obj_is_valid(g_statusbar.root)) {
+            lv_obj_del(g_statusbar.root);
+            memset(&g_statusbar, 0, sizeof(g_statusbar));
+          }
+          buildGlobalStatusBar();
+          lv_obj_invalidate(scr);
         }
       }
     }
@@ -57396,7 +57232,6 @@ static const PopupEnt k_popup_registry[] = {
 #if defined(HAS_TDECK_GT911) || defined(HAS_THINKNODE_M9)
   { P_OPEN(s_lockwall_picker),       []{ lockwallPickerClose(); },        PF_COUNT },
 #endif
-  { P_OPEN(s_accent_picker),         []{ accentPickerClose(); },          PF_COUNT | PF_SWIPE },
   { P_OPEN(s_tz_picker),             []{ tzPickerClose(); },              PF_COUNT },
   { P_OPEN(s_chanscope_modal),       []{ chanScopeClose(); },             PF_COUNT | PF_SWIPE },
   { P_OPEN(s_blocked_modal),         []{ blockedModalClose(); },          PF_COUNT | PF_SWIPE },

@@ -1964,6 +1964,13 @@ static void prefsPutUChar(const char* key, uint8_t v) {
   s_begun = s_prefs.begin(TOUCH_NS, true);
 }
 // Same re-open dance as prefsPutUChar above, for the one 16-bit setting.
+static void prefsPutInt(const char* key, int32_t v) {
+  s_prefs.end();
+  if (!s_prefs.begin(TOUCH_NS, false)) { s_begun = s_prefs.begin(TOUCH_NS, true); return; }
+  s_prefs.putUInt(key, (uint32_t)v);
+  s_prefs.end();
+  s_begun = s_prefs.begin(TOUCH_NS, true);
+}
 static void prefsPutUShort(const char* key, uint16_t v) {
   s_prefs.end();
   if (!s_prefs.begin(TOUCH_NS, false)) { s_begun = s_prefs.begin(TOUCH_NS, true); return; }
@@ -2059,6 +2066,13 @@ uint8_t touchPrefsGetDayTheme()       { if (!s_begun) touchPrefsBegin(); return 
 void    touchPrefsSetDayTheme(uint8_t t)   { if (!s_begun) touchPrefsBegin(); s_cfg.day_theme = t; cfgFlush(); }
 bool    touchPrefsGetAutoAodSun()     { if (!s_begun) touchPrefsBegin(); return s_cfg.auto_aod_sun  != 0; }
 void    touchPrefsSetAutoAodSun(bool on)   { if (!s_begun) touchPrefsBegin(); s_cfg.auto_aod_sun  = on ? 1 : 0; cfgFlush(); }
+int32_t touchPrefsGetSunLat() { if (!s_begun) touchPrefsBegin(); return (int32_t)s_prefs.getUInt("sun_lat", 0); }
+int32_t touchPrefsGetSunLon() { if (!s_begun) touchPrefsBegin(); return (int32_t)s_prefs.getUInt("sun_lon", 0); }
+void    touchPrefsSetSunPos(int32_t lat_e6, int32_t lon_e6) {
+  if (!s_begun) touchPrefsBegin();
+  prefsPutInt("sun_lat", lat_e6);
+  prefsPutInt("sun_lon", lon_e6);
+}
 
 #if defined(HAS_TANMATSU)   // only the Tanmatsu has the message LED — keep S3 (T-Deck/V4) bins unchanged
 bool touchPrefsGetMsgLed() { if (!s_begun) touchPrefsBegin(); return s_prefs.getUChar("msg_led", 1) != 0; }   // default ON

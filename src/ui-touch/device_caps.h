@@ -129,7 +129,11 @@
   #define CAP_FILESYSTEM   1   // SD_MMC + internal FFat 'storage'
   #define CAP_GPS          1   // L76K
   #define CAP_OTA          1   // standalone dual-OTA app
-  #define CAP_LOCK_SCREEN  1
+  // No lock screen: there is no way to reach it (the CC Lock button is HAS_TDECK_GT911-only),
+  // no unlock gesture (every unlock path is trackball / Vol- / d-pad / wake-button), and
+  // DSEC_LOCK settings are gated to T-Deck and M9 — enabling this only produced an empty
+  // Lock screen settings card (#451). Restore when a touch reveal + hold-to-unlock path exists.
+  #define CAP_LOCK_SCREEN  0
 
 #elif defined(ATTAKY_MESH_SERIES)
   #define CAP_TOUCH        1
@@ -305,7 +309,15 @@
   #define CAP_KBD_BACKLIGHT 0
 #endif
 
-#if defined(HAS_UI_SOUND)
+// Notification-chime hardware: T-Deck I2S speaker, Pager codec, Heltec V4 / M9 GPIO
+// piezo, T-Display P4 ES8311. Kept in step with the HAS_UI_SOUND definition in
+// UITask.cpp, which derives FROM this rather than duplicating the list.
+//
+// HAS_UI_SOUND is defined inside UITask.cpp ~1400 lines AFTER this header is included,
+// so evaluating it here always yielded 0. Every macro below is a -D on the compiler
+// command line and is genuinely visible at this point.
+#if defined(HAS_TDECK_GT911) || defined(HELTEC_V4_BUZZER_PIN) || defined(TLORA_PAGER) || \
+    defined(THINKNODE_M9_BUZZER_PIN) || defined(HAS_TDISPLAY_P4)
   #define CAP_SOUND 1
 #else
   #define CAP_SOUND 0

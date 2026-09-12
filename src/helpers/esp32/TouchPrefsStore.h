@@ -216,6 +216,10 @@ bool    touchPrefsGetBootWifiTime();
 bool    touchPrefsSetBootWifiTime(bool on);
 uint16_t touchPrefsGetGpsFuzzM();
 bool     touchPrefsSetGpsFuzzM(uint16_t m);
+/** v59: when true, telemetry position ANSWERS to permitted contacts carry the real fix
+ *  instead of the advert displacement. The advert stays displaced either way. Off by default. */
+bool     touchPrefsGetTelemLocExact();
+bool     touchPrefsSetTelemLocExact(bool on);
 bool    touchPrefsGetLoudAlerts();
 bool    touchPrefsSetLoudAlerts(bool on);
 bool    touchPrefsGetBootWifiTimeOpen();

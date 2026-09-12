@@ -2098,6 +2098,7 @@ struct LvContactButtonCtx {
   bool     is_fav;       // favorites can't be multi-select-deleted (unfavorite first)
   uint8_t  key6[6];      // stable identity for the multi-select set (pub_key prefix)
   lv_obj_t* age_lbl;     // the row's Heard label — updated in place on the 60s age tick (#82)
+  lv_obj_t* name_lbl;   // the row's Name label — updated in place on an advert name-fill (#463)
 };
 
 static void* psAlloc(size_t n);   // defined below — PSRAM-first, zero-init
@@ -19238,8 +19239,6 @@ static uint16_t batteryFullMv() {
 // (R8: the divider is permanently connected — PIN_ADC_CTRL=-1 — so the same
 // EMA + above-full voltage heuristic applies; threshold accuracy vs the
 // uncalibrated ADC_MULTIPLIER=5.07 conversion needs on-device confirmation.)
-static constexpr uint16_t kBattChargingMv = 4250;
-
 // Per-board battery sampler: EMA over the noisy ADC so the value doesn't jitter
 // ±1 every tick. Wrapped by batteryMvSmoothed() (below), which only publishes a
 // fresh value every 20 s. Returns 0 if unsupported.
@@ -19260,12 +19259,29 @@ static uint16_t batteryMvSampled() {
   }
   return (uint16_t)(s_ema + 0.5f);
 }
-static bool batteryIsCharging(uint16_t mv) { return mv >= (uint16_t)(batteryFullMv() + 50); }
 #else
-// V4 (and any non-T-Deck touch board): direct read, no charge-from-voltage.
+// V4 (and any non-T-Deck touch board): direct read, no EMA.
 static uint16_t batteryMvSampled() { return g_lv.task ? g_lv.task->getBattMilliVolts() : 0; }
-static bool batteryIsCharging(uint16_t) { return false; }
 #endif
+// Charge detection is SHARED by every board: a rail sitting above a full pack
+// means something external is holding it there.
+//
+// This used to live inside the T-Deck/R8 branch and the #else returned a flat false,
+// so only those two boards ever showed a charging icon. That split was a deliberate
+// call about the V4's noisy ADC dragging the EMA down — but it decided the question
+// for every OTHER board too, purely by falling through. The M9, Pager, RAK Tap,
+// Wio L2, Attaky, P4 and Tanmatsu could never report charging no matter what the
+// hardware did (reported by museifu696, V4-R8 by thesupergeek; #473).
+// The EMA stays gated as before; only the verdict is shared.
+//
+// Deliberately pure: batteryMvSmoothed()'s charge_flip calls this twice with
+// different arguments to compare old and new verdicts, so a latching Schmitt
+// trigger here would corrupt itself. Flap is bounded by the 20 s publish hold
+// and the 50 mV margin above full.
+static bool batteryIsCharging(uint16_t mv) {
+  const uint16_t full = batteryFullMv();
+  return mv != 0 && mv >= (uint16_t)(full + 50);
+}
 
 // Hold the battery reading steady: publish a fresh value only every 20 s so the
 // %, icon and voltage stop twitching tick-to-tick. The per-board sampler above
@@ -36718,13 +36734,19 @@ static double   s_ct_sort_self_lat = 0.0, s_ct_sort_self_lon = 0.0;
 // existing rows and set the Heard text in place instead. Returns false when a
 // stored label is stale (list mutated outside a build) so the caller falls back
 // to the full rebuild — never a wrong display, worst case the old cost.
-static int s_contacts_rows_built = 0;   // rows rendered by the last full build
-static bool ctRefreshAgeLabelsInPlace() {
+static int  s_contacts_rows_built = 0;   // rows rendered by the last full build
+// Name-column geometry from the last full build, so the in-place name refresh can
+// re-pick LONG_DOT vs LONG_SCROLL_CIRCULAR exactly like the builder does.
+static int  s_ct_name_w   = 0;
+static bool s_ct_name_mid = false;
+static bool ctRefreshRowsInPlace() {
   if (!g_lv.contacts_list) return false;
   const uint32_t now_secs = the_mesh.getRTCClock()->getCurrentTime();
   for (int k = 0; k < s_contacts_rows_built; ++k) {
     lv_obj_t* lbl = s_contacts_ctx[k].age_lbl;
     if (!lbl || !lv_obj_is_valid(lbl)) return false;
+    lv_obj_t* nm  = s_contacts_ctx[k].name_lbl;
+    if (nm && !lv_obj_is_valid(nm)) return false;
     ContactInfo* c = the_mesh.lookupContactByPubKey(s_contacts_ctx[k].key6, 6);
     if (!c) continue;   // deleted mid-window — the count change triggers a full rebuild right after
     char age_buf[12]; uint32_t age_secs = 0;
@@ -36732,6 +36754,23 @@ static bool ctRefreshAgeLabelsInPlace() {
       age_secs = now_secs - c->last_advert_timestamp;
     formatAgeBadge(age_buf, sizeof age_buf, age_secs);
     lv_label_set_text(lbl, age_buf);
+    // An advert can fill in a previously-blank name on an existing contact — the
+    // whole reason the advert path used to force a full teardown+rebuild (#73).
+    // Doing it here keeps that guarantee for a fraction of the cost (#463).
+    if (nm) {
+      char san[40];
+      copyUtf8ReplacingMissingGlyphs(&g_font_14, san, sizeof(san), c->name);
+      if (strcmp(lv_label_get_text(nm), san) != 0) {
+        if (!s_ct_name_mid && s_ct_name_w > 0) {
+          lv_point_t nsz;
+          lv_txt_get_size(&nsz, san, &g_font_14, 0, 0, s_ct_name_w, LV_TEXT_FLAG_NONE);
+          const int name_line_h = lv_font_get_line_height(&g_font_14);
+          lv_label_set_long_mode(nm, (nsz.y > 2 * name_line_h) ? LV_LABEL_LONG_SCROLL_CIRCULAR
+                                                               : LV_LABEL_LONG_DOT);
+        }
+        lv_label_set_text(nm, san);
+      }
+    }
   }
   return true;
 }
@@ -36768,7 +36807,7 @@ static void refreshContactsList() {
     // Only the age labels are stale — update them in place instead of the ~1.3s
     // full teardown+rebuild (#82). Falls through to the rebuild if a row pointer
     // went stale.
-    if (ctRefreshAgeLabelsInPlace()) { s_last_age_refresh_ms = now_ms; return; }
+    if (ctRefreshRowsInPlace()) { s_last_age_refresh_ms = now_ms; return; }
   }
   s_ct_list_force = false;
   s_last_count  = curr_count;
@@ -37077,7 +37116,10 @@ static void refreshContactsList() {
     lv_label_set_long_mode(hl, LV_LABEL_LONG_CLIP);
     if (mid_cols) lv_obj_align(hl, LV_ALIGN_TOP_LEFT, name_x, row2_y);
     else          lv_obj_align(hl, LV_ALIGN_LEFT_MID, heard_x, 0);
-    s_contacts_ctx[k].age_lbl = hl;        // in-place 60s age updates (#82)
+    s_contacts_ctx[k].age_lbl  = hl;       // in-place 60s age updates (#82)
+    s_contacts_ctx[k].name_lbl = nm;       // in-place advert name-fill (#463)
+    s_ct_name_w   = name_w;
+    s_ct_name_mid = mid_cols;
     s_contacts_rows_built = k + 1;
 
     // Location column — explicit width so "1.4km" / "390ft" fit and don't
@@ -55895,15 +55937,32 @@ void UITask::loop() {
   // "only shows when I sort by messages received" report). Keep the flag set until we're actually on
   // the Contacts tab so an advert heard on another tab isn't dropped, and coalesce an advert flood to
   // at most one rebuild per ~350 ms.
-  if (s_ct_contacts_dirty && getActiveTab() == CONTACTS_TAB_INDEX) {
+  if (s_ct_contacts_dirty && getActiveTab() == CONTACTS_TAB_INDEX && !s_ctd_active) {
     static unsigned long s_ct_dirty_refresh_ms = 0;
+    static unsigned long s_ct_dirty_rebuild_ms = 0;
     // 2.5 s coalescing (was 350 ms): a full rebuild costs ~1.3 s at ~570 contacts
     // (#82), so an advert flood must not be able to queue them back to back. The
     // flag stays set, so the last advert in a burst still lands within 2.5 s.
     if ((now - s_ct_dirty_refresh_ms) > 2500) {
       s_ct_contacts_dirty   = false;
       s_ct_dirty_refresh_ms = now;
-      contactsListForceRefresh();   // bypass the count-cache — a name-fill / re-advert doesn't change the count
+      // #463: forcing the full teardown here meant that on a mesh with adverts
+      // flowing, every 2.5 s on the Contacts tab cost a ~1.3 s rebuild — the UI
+      // froze "in the middle" of the tab transition, and only when something was
+      // being discovered (with no adverts the flag never sets and the count-cache
+      // no-ops). Everything an advert actually changes on an EXISTING row (the
+      // name-fill of #73 and the Heard age) is now written in place. A brand-new
+      // or deleted contact changes getNumContacts(), which the count safety net
+      // just below catches independently, so the guarantee still holds.
+      const bool in_place_ok = ctRefreshRowsInPlace();
+      // Ordering / filter eligibility still need a real rebuild (an advert can
+      // change the last-heard sort position, or give a contact the GPS fix the
+      // "has location" filter wants). Converge on the same 60 s cadence the age
+      // tick already uses instead of every 2.5 s.
+      if (!in_place_ok || (now - s_ct_dirty_rebuild_ms) > 60000UL) {
+        s_ct_dirty_rebuild_ms = now;
+        contactsListForceRefresh();   // bypass the count-cache — a re-advert doesn't change the count
+      }
     }
   }
   // Safety net (#73): some contact mutations never set the dirty flag above — messaging a not-yet-

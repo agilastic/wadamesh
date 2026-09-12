@@ -2433,5 +2433,17 @@ bool touchPrefsSetGpsFuzzM(uint16_t m) {
   prefsPutUShort("gps_fuzz_m", m);
   return true;
 }
+// v59: whether telemetry position answers carry the real fix instead of the displacement.
+// Stored as a plain NVS key (not in Config) — it's a per-device opt-in that should survive
+// a schema migration without forcing a version bump.
+bool touchPrefsGetTelemLocExact() {
+  if (!s_begun) touchPrefsBegin();
+  return s_prefs.getUChar("telem_exact", 0) != 0;
+}
+bool touchPrefsSetTelemLocExact(bool on) {
+  if (!s_begun) touchPrefsBegin();
+  prefsPutUChar("telem_exact", on ? 1 : 0);
+  return true;
+}
 
 #endif

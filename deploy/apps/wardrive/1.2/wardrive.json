@@ -1,0 +1,1 @@
+{"id":"wardrive","name":"Wardrive","ver":"1.2","desc":"LoRa coverage survey with live signal map. Probes every 20s, logs GPS + BOTH link directions to CSV. Map view shows a colour-coded track (green=strong, red=weak). Node view lists every responder with SNR asymmetry."}

@@ -28958,8 +28958,8 @@ static void makeSettings(lv_obj_t* tab) {
   s_settings_sheet    = nullptr;
   s_settings_open_cat = -1;
 
-  // Category landing: a single-column list in portrait, a 2-column grid in
-  // landscape (uses the extra width). Each card opens a focused detail sheet.
+  // iOS-style category grid: 2 columns always, icon in accent-coloured rounded
+  // square at top, name centred below. Scrolls vertically on overflow.
   const bool landscape = lv_disp_get_hor_res(nullptr) > lv_disp_get_ver_res(nullptr);
   const lv_coord_t hor = lv_disp_get_hor_res(nullptr);
 
@@ -28968,17 +28968,21 @@ static void makeSettings(lv_obj_t* tab) {
   lv_obj_remove_style_all(land);
   lv_obj_set_size(land, lv_pct(100), lv_pct(100));
   styleSurface(land, COLOR_BG, 0);
-  lv_obj_set_style_pad_all(land, 8, LV_PART_MAIN);
-  lv_obj_set_style_pad_row(land, 8, LV_PART_MAIN);
-  lv_obj_set_style_pad_column(land, 8, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(land, 6, LV_PART_MAIN);
+  lv_obj_set_style_pad_row(land, 6, LV_PART_MAIN);
+  lv_obj_set_style_pad_column(land, 6, LV_PART_MAIN);
   lv_obj_set_scroll_dir(land, LV_DIR_VER);
   styleSettingsScrollbar(land);
-  lv_obj_set_flex_flow(land, landscape ? LV_FLEX_FLOW_ROW_WRAP : LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_flow(land, LV_FLEX_FLOW_ROW_WRAP);   // always 2-column grid
 
-  // hor - 16 (page pad) - 8 (right gutter so the rightmost card clears the scrollbar);
-  // landscape subtracts another 8 for the inter-column gap, then halves.
-  const lv_coord_t card_w = landscape ? (lv_coord_t)((hor - 24 - 8) / 2) : (lv_coord_t)(hor - 24);
-  const lv_coord_t card_h = landscape ? 54 : 46;
+  // 2 columns: (hor - pad_left - pad_right - col_gap) / 2
+  // Scrollbar eats ~6 px on the right; subtract that too.
+  const lv_coord_t card_w = (lv_coord_t)((hor - 12 - 6 - 6) / 2);  // 6+6 pads, 6 gap
+  // Landscape (T-Deck 320×240): shorter cards fit more rows above the fold.
+  // Portrait (other boards): taller cards look more iOS-app-icon-like.
+  const lv_coord_t card_h = landscape ? 68 : 80;
+  // Icon badge: accent-coloured rounded square inside the card
+  const lv_coord_t icon_box = landscape ? 30 : 36;
 
   for (int c = 0; c < CAT_COUNT; ++c) {
     if (c == CAT_SENSORS) continue;   // Sensors page only exists with the V4 Expansion Kit
@@ -28991,52 +28995,51 @@ static void makeSettings(lv_obj_t* tab) {
     lv_obj_set_size(card, card_w, card_h);
     lv_obj_set_style_bg_color(card, lv_color_hex(COLOR_PANEL), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(card, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(card, lv_color_hex(COLOR_ACCENT), LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(card, lv_color_hex(COLOR_BORDER), LV_PART_MAIN | LV_STATE_PRESSED);
     lv_obj_set_style_radius(card, 10, LV_PART_MAIN);
     lv_obj_set_style_border_width(card, 1, LV_PART_MAIN);
     lv_obj_set_style_border_color(card, lv_color_hex(COLOR_POPUP_BORDER), LV_PART_MAIN);
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(card, settingsCatOpenCb, LV_EVENT_CLICKED, (void*)(intptr_t)c);
 
-    lv_obj_t* icon = lv_label_create(card);
+    // Accent-coloured rounded square — the iOS app-icon badge
+    lv_obj_t* icon_bg = lv_obj_create(card);
+    lv_obj_remove_style_all(icon_bg);
+    lv_obj_clear_flag(icon_bg, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(icon_bg, icon_box, icon_box);
+    lv_obj_set_style_bg_color(icon_bg, lv_color_hex(COLOR_ACCENT), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(icon_bg, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(icon_bg, 7, LV_PART_MAIN);
+    // Top-centre: leave room for the label at the bottom
+    lv_obj_align(icon_bg, LV_ALIGN_TOP_MID, 0, 8);
+
+    lv_obj_t* icon = lv_label_create(icon_bg);
     lv_label_set_text(icon, kSettingsCats[c].icon);
     lv_obj_set_style_text_font(icon, &g_font_16, LV_PART_MAIN);
-    lv_obj_set_style_text_color(icon, lv_color_hex(COLOR_ACCENT), LV_PART_MAIN);
-    lv_obj_align(icon, LV_ALIGN_LEFT_MID, 12, 0);
+    lv_obj_set_style_text_color(icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_align(icon, LV_ALIGN_CENTER, 0, 0);
 
+    // Label centred at the bottom of the card
     lv_obj_t* lbl = lv_label_create(card);
     lv_label_set_text(lbl, TR(kSettingsCats[c].label));
-    lv_obj_set_style_text_font(lbl, &g_font_14, LV_PART_MAIN);
+    lv_obj_set_style_text_font(lbl, &g_font_12, LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
-    // Category name sits visually CENTRED in the card (icon stays a left accent).
-    // The label spans the card minus a symmetric margin (so the left accent icon
-    // never overlaps the text) and centre-aligns within that box; wrap keeps a long
-    // translated name (e.g. "Πληκτρολόγιο", "Schnellantworten") inside the card.
-    // No right chevron — it fought the centred text and pulled the eye off-centre.
-    // Fill the card to the RIGHT of the left accent icon and centre within that
-    // region. The old symmetric 40-px margins left only ~64 px on the T-Deck's
-    // 2-column landscape cards, so a single word ("Bluetooth") split mid-word and
-    // "Radio & Mesh" wrapped to two lines. Using the full post-icon width (~100 px)
-    // keeps every English category name on one line, unsplit; long translations
-    // still wrap at word boundaries.
-    lv_obj_set_width(lbl, card_w - 34 - 8);   // start just past the icon, small right margin
-    lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lbl, card_w - 8);
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align(lbl, LV_ALIGN_LEFT_MID, 34, 0);
+    lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -6);
 
-    if (c == CAT_ABOUT) {   // update-available dot rides on the About card
+    if (c == CAT_ABOUT) {   // update-available dot — top-right of icon badge
       s_update_subtab_badge = lv_obj_create(card);
       lv_obj_remove_style_all(s_update_subtab_badge);
-      // Pure decoration: a bare lv_obj is CLICKABLE by default, and keypad-nav's
-      // leaf rule then harvests the dot INSTEAD of the About button it sits on
-      // (the button became "a container with a clickable child"), making About
-      // unreachable by keyboard whenever the update badge shows.
+      // Not clickable: keypad-nav leaf rule would steal focus from the card.
       lv_obj_clear_flag(s_update_subtab_badge, LV_OBJ_FLAG_CLICKABLE);
       lv_obj_set_size(s_update_subtab_badge, 9, 9);
       lv_obj_set_style_radius(s_update_subtab_badge, LV_RADIUS_CIRCLE, LV_PART_MAIN);
       lv_obj_set_style_bg_color(s_update_subtab_badge, lv_color_hex(0xE2403A), LV_PART_MAIN);
       lv_obj_set_style_bg_opa(s_update_subtab_badge, LV_OPA_COVER, LV_PART_MAIN);
-      lv_obj_align(s_update_subtab_badge, LV_ALIGN_RIGHT_MID, landscape ? -12 : -32, 0);
+      // Badge sits top-right corner of the icon square
+      lv_obj_align_to(s_update_subtab_badge, icon_bg, LV_ALIGN_OUT_TOP_RIGHT, 4, 4);
       lv_obj_add_flag(s_update_subtab_badge, LV_OBJ_FLAG_HIDDEN);
     }
   }

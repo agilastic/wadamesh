@@ -2026,7 +2026,7 @@ uint32_t MyMesh::companionRetryDelay(const mesh::Packet* packet, bool direct,
   const uint32_t max_packet_airtime = _radio->getEstAirtimeFor(MAX_TRANS_UNIT);
   const uint32_t jitter_percent = getRNG()->nextInt(0, 201);
   return CompanionRetryPolicy::floodDelay(max_packet_airtime, packet_airtime,
-                                           jitter_percent);
+                                           jitter_percent, attempt_idx);
 }
 
 void MyMesh::companionRetryResetSlot(int slot_idx) {

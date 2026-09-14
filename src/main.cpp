@@ -18,7 +18,6 @@
                                              // (quoted: use wadamesh's src/ copy, not the lib's stale one)
 #include "helpers/esp32/BootTimeSync.h"      // opt-in cold-boot clock sync over saved Wi-Fi (#383)
 #include "ui-touch/i18n.h"                    // translated Pager transport-state alerts
-#include "wadamesh_mark_rgb.h"               // anti-aliased mesh-mark (RGB565) for the pre-LVGL boot screen
 #include "ui-touch/TouchSleep.h"             // idle light-sleep controller (loopEnd called at end of loop())
 #endif
 
@@ -859,20 +858,13 @@ void setup() {
       else if (r == 3) display.setDisplayRotation(3);
     }
 #endif
-    // Paint the WADAMESH mesh mark the instant the panel is up, so the logo is on
-    // screen from power-on — before LVGL is ready. Blitted as an anti-aliased
-    // RGB565 bitmap via the full-res LVGL path (writePixelsRGB565), so the
-    // diagonals are smooth, not 1-bit jagged. White-on-black here; the teal dots
-    // arrive with the LVGL splash. Centred exactly: the artwork is centred within
-    // the bitmap, and the colour splash mark is centred to the same point, so the
-    // hand-off stays in place.
-    // Explicit black: startFrame()'s default is UIColor::window_bkg, and on boards
-    // whose DISPLAY_CLASS is a core driver the 1.17 core's palette makes that WHITE
-    // (the boot logo grew a white border). Our pre-LVGL screens are always dark.
     display.startFrame((ColorVal)0x0000);
-    display.writePixelsRGB565((display.width()  - WADAMESH_MARK_W) / 2,
-                              (display.height() - WADAMESH_MARK_H) / 2,
-                              WADAMESH_MARK_W, WADAMESH_MARK_H, WADAMESH_MARK_RGB565);
+    display.setTextSize(2);
+    display.setColor((ColorVal)0x04F3);   // ~teal #15B6A6 in RGB565
+    display.drawTextCentered(display.width() / 2, display.height() / 2 - 12, "T-DECK WADAMESH");
+    display.setTextSize(1);
+    display.setColor((ColorVal)0x8410);   // mid-grey
+    display.drawTextCentered(display.width() / 2, display.height() / 2 + 10, "agilastic customs");
     display.endFrame();
   }
 #endif

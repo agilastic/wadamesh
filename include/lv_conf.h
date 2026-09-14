@@ -51,6 +51,12 @@
 // while still allowing a deliberate drag to scroll.
 #define LV_INDEV_DEF_SCROLL_LIMIT 24
 
+// Place LVGL's hot draw functions (pixel blitters, blend loops, rect fill) in
+// IRAM instead of Flash. ESP32-S3 Flash reads pay a cache-miss penalty on every
+// call; IRAM has zero-wait access. Espressif reports 20-30% render speedup.
+// If the build fails with IRAM overflow, remove this define.
+#define LV_ATTRIBUTE_FAST_MEM IRAM_ATTR
+
 #define LV_USE_LOG 0
 
 #define LV_FONT_MONTSERRAT_12 1

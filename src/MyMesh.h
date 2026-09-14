@@ -1137,11 +1137,11 @@ public:
    *  companion app's CMD_REMOVE_CONTACT). The base removeContact() only drops it
    *  from RAM, so without rewriting /contacts3 the contact reappears on the next
    *  reboot. Also deletes its stored blob and pings the chats list. */
-  bool uiRemoveContact(const ContactInfo& c) {
+  bool uiRemoveContact(const ContactInfo& c, bool persist = true) {
     ContactInfo* slot = lookupContactByPubKey(c.id.pub_key, PUB_KEY_SIZE);
     if (!slot || !removeContact(*slot)) return false;
     _store->deleteBlobByKey(c.id.pub_key, PUB_KEY_SIZE);
-    saveContacts();
+    if (persist) saveContacts();
     if (_ui) _ui->onThreadsChanged();
     return true;
   }
@@ -1202,7 +1202,7 @@ public:
   bool isRadioReceiving() const { return _radio && _radio->isReceiving(); }
 
 private:
-  bool _companion_retry_enabled = false;  // opt-in; UITask::begin() applies the persisted toggle
+  bool _companion_retry_enabled = true;   // default ON; UITask::begin() applies the persisted toggle
   static const uint8_t COMPANION_TEXT_QUEUE_CAPACITY = 16;
   uint8_t companionDetachQueuedText(mesh::Packet* packets[], uint8_t priorities[],
                                     uint32_t scheduled_for[]);

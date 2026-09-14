@@ -142,7 +142,7 @@ static void cfgSetDefaults(TouchCfg& c) {
   c.compact_chat      = 0;      // OFF: bubble chat layout (opt-in IRC-style dense rows)
   c.clock_floor       = 0;      // no persisted send-timestamp floor yet
   c.rx_queue          = 1;      // ON: buffered receive (test-channel default; opt-out toggle in Radio & Mesh)
-  c.retry_echo        = 0;      // OFF: auto-retry is opt-in (toggle in Radio & Mesh)
+  c.retry_echo        = 1;      // ON: auto-retry is default active (toggle in Radio & Mesh)
   c.app_hide          = (1u << 12);  // APPHIDE_MQTT: the MQTT bridge starts hidden (experimental + privacy)
   memset(c.lang_file, 0, sizeof c.lang_file);   // no file language: built-in ui_lang column
   c.sleep_idle        = 1;      // default: idle light-sleep ON (v56: flipped from OFF)
@@ -279,7 +279,7 @@ static void cfgLoadOrMigrate() {
         if (stored_version < 31) s_cfg.compact_chat = 0;  // new trailing field: compact chat rows off by default
         if (stored_version < 32) s_cfg.clock_floor = 0;   // new trailing field: no send-timestamp floor persisted yet (#89)
         if (stored_version < 33) s_cfg.rx_queue = 1;      // buffered LoRa receive ON for the test channel (opt-out toggle in Radio & Mesh)
-        if (stored_version < 45) s_cfg.retry_echo = 0;    // v45: correctly appended auto-retry preference; opt-in per user feedback
+        if (stored_version < 45) s_cfg.retry_echo = 1;    // v45: correctly appended auto-retry preference; now default ON
         // v45 also lands Hungarian INSERTED at UiLang slot 1 (#227), which shifts every
         // stored non-English choice by one. Remap once; RO (old max 12) becomes 13.
         if (stored_version < 45 && s_cfg.ui_lang >= 1 && s_cfg.ui_lang <= 12) s_cfg.ui_lang += 1;

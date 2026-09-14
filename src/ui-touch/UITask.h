@@ -139,7 +139,7 @@ private:
 #ifdef PIN_VIBRATION
   GenericVibration vibration;
 #endif
-  unsigned long _next_refresh, _auto_off;
+  unsigned long _next_refresh, _next_slow_refresh, _auto_off;
   /* Screen timeout: track last input activity and turn off the TFT when
    * idle for `_screen_timeout_ms` (0 = never sleep). Cached from NVS prefs;
    * any touch / user-button press resets the deadline and rewakes the panel. */

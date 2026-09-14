@@ -17,6 +17,10 @@ static portMUX_TYPE s_keyboard_mux = portMUX_INITIALIZER_UNLOCKED;
 static uint8_t s_ring[16];
 static uint8_t s_head = 0;
 static uint8_t s_tail = 0;
+// Space is col=0 row=5 in the raw matrix. Updated each raw frame; stays false in legacy mode.
+// std::atomic for cross-core visibility (Core 0 writes, UI Core 1 reads).
+#include <atomic>
+static std::atomic<bool> s_space_down{false};
 static bool             s_inited = false;
 enum class KeyboardMode : uint8_t { Probe, Raw, Legacy };
 // How long to keep asking the C3 for raw frames before settling for legacy mode.
@@ -59,6 +63,7 @@ static int keyboardRead(uint8_t* out, size_t count) {
 }
 
 static void processRawFrame(const uint8_t frame[TDeckKeyboardState::COLS], uint32_t now_ms) {
+  s_space_down = (frame[0] & (1u << 5)) != 0;   // col=0 row=5 = space key
   uint8_t keys[16];
   portENTER_CRITICAL(&s_keyboard_mux);
   const uint32_t generation = s_modifier_mode_generation;
@@ -271,6 +276,9 @@ int tdeckKeyboardReadKey() {
   portEXIT_CRITICAL(&s_keyboard_mux);
   return key;
 }
+
+// True while the space key is physically held (raw mode only; always false in legacy mode).
+bool tdeckKeyboardIsSpaceDown() { return s_space_down; }
 
 void tdeckKeyboardDiscardModifiers() {
   portENTER_CRITICAL(&s_keyboard_mux);

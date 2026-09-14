@@ -7,17 +7,23 @@
 namespace CompanionRetryPolicy {
 
 // These are the companion defaults from MeshCore's keymindCascade branch.
-static const uint8_t DIRECT_MAX_ATTEMPTS = 21;
-static const uint8_t FLOOD_MAX_ATTEMPTS = 15;
+// Tuned for ~10 min total DM retry window / ~5 min channel retry window
+// at typical T-Deck airtime (~500 ms @ SF10/BW250).
+static const uint8_t DIRECT_MAX_ATTEMPTS = 30;
+static const uint8_t FLOOD_MAX_ATTEMPTS = 20;
 
 inline uint32_t directDelay(uint32_t packet_airtime_ms, uint8_t attempt_idx) {
-  return 200UL + (7UL * packet_airtime_ms) + (100UL * attempt_idx);
+  // Starts at ~2 s, grows ~1.2 s per attempt → ~10 min total across 30 attempts at 500 ms airtime
+  return 2000UL + (7UL * packet_airtime_ms) + (1241UL * attempt_idx);
 }
 
 inline uint32_t floodDelay(uint32_t max_packet_airtime_ms,
                            uint32_t packet_airtime_ms,
-                           uint32_t jitter_percent) {
-  return max_packet_airtime_ms + (20UL * packet_airtime_ms)
+                           uint32_t jitter_percent,
+                           uint8_t attempt_idx = 0) {
+  // Starts at ~3 s, grows ~1.3 s per attempt → ~5 min total across 20 attempts at 500 ms airtime
+  return max_packet_airtime_ms + (6UL * packet_airtime_ms)
+      + (1263UL * attempt_idx)
       + ((packet_airtime_ms * jitter_percent) / 100UL);
 }
 

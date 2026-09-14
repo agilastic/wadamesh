@@ -29,6 +29,9 @@ void tdeckKeyboardPoll();
 /** Pop the next buffered key (ASCII), or 0 if none. Safe from the UI thread. */
 int tdeckKeyboardReadKey();
 
+/** True while the space key is physically held (raw mode only; always false in legacy mode). */
+bool tdeckKeyboardIsSpaceDown();
+
 /** Cancel one-shot/locked modifiers and suppress a later release from a
  * currently held modifier. Call when queued input is intentionally discarded. */
 void tdeckKeyboardDiscardModifiers();

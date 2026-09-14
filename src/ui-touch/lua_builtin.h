@@ -206,128 +206,6 @@ function app.on_tick(dt) refresh() end
 
 return app
 )WADALUA";
-static const char kLuaSrc_snake[] = R"WADALUA(-- Snake — wada.* reference app. Swipe (or trackball) to steer; eat the red
--- food, don't bite yourself. Tap after a game over to play again.
-local ui, sys, store, timer = wada.ui, wada.sys, wada.store, wada.timer
-local C = ui.colors
-
-local CELL = 14
-local app = {}
-local cv, score_lbl
-local cols, rows, px_w, px_h
-local body, len, dx, dy, ndx, ndy, fx, fy
-local score, hiscore, running, over
-
-local function place_food()
-  repeat
-    fx, fy = sys.random(0, cols - 1), sys.random(0, rows - 1)
-    local clash = false
-    for i = 1, len do
-      if body[i].x == fx and body[i].y == fy then clash = true break end
-    end
-  until not clash
-end
-
-local function reset()
-  len, score, over, running = 3, 0, false, false
-  dx, dy, ndx, ndy = 1, 0, 1, 0
-  body = {}
-  local cx, cy = math.floor(cols / 2), math.floor(rows / 2)
-  for i = 1, len do body[i] = { x = cx - i + 1, y = cy } end
-  place_food()
-end
-
-local function scoreline()
-  score_lbl:set(string.format("Score %d   Best %d%s", score, hiscore,
-                              running and "" or (over and "   -  tap to retry" or "   -  swipe to start")))
-end
-
-local function draw()
-  cv:fill(0x101418)
-  cv:rect(fx * CELL + 2, fy * CELL + 2, CELL - 4, CELL - 4, C.bad, true, 4)
-  for i = len, 1, -1 do
-    cv:rect(body[i].x * CELL + 1, body[i].y * CELL + 1, CELL - 2, CELL - 2,
-            i == 1 and C.accent or C.good, true, 3)
-  end
-  if over then
-    cv:text(math.floor(px_w / 2) - 40, math.floor(px_h / 2) - 10, "GAME OVER", C.text, 16)
-  end
-end
-
-local function step()
-  dx, dy = ndx, ndy
-  local head = body[1]
-  local nx, ny = head.x + dx, head.y + dy
-  if nx < 0 or ny < 0 or nx >= cols or ny >= rows then over = true end
-  if not over then
-    for i = 1, len - 1 do
-      if body[i].x == nx and body[i].y == ny then over = true break end
-    end
-  end
-  if over then
-    running = false
-    if score > hiscore then
-      hiscore = score
-      store.set("hiscore", hiscore)
-      sys.toast("New high score: " .. hiscore, 1600)
-    end
-    scoreline()
-    draw()
-    return
-  end
-  table.insert(body, 1, { x = nx, y = ny })
-  if nx == fx and ny == fy then
-    len = len + 1
-    score = score + 10
-    place_food()
-    scoreline()
-  else
-    body[#body] = nil
-  end
-  draw()
-end
-
-function app.on_open(w, h)
-  hiscore = store.get("hiscore", 0)
-  cols = math.floor(w / CELL)
-  rows = math.floor((h - 26) / CELL)
-  px_w, px_h = cols * CELL, rows * CELL
-  score_lbl = ui.label("", 4, 4, 14, C.text)
-  cv = ui.canvas(px_w, px_h)
-  cv:pos(math.floor((w - px_w) / 2), 26)
-  reset()
-  scoreline()
-  draw()
-  timer.every(120)
-end
-
-function app.on_input(ev)
-  if ev.type == "swipe" then
-    local d = ev.dir
-    if     d == "up"    and dy ~= 1  then ndx, ndy = 0, -1
-    elseif d == "down"  and dy ~= -1 then ndx, ndy = 0, 1
-    elseif d == "left"  and dx ~= 1  then ndx, ndy = -1, 0
-    elseif d == "right" and dx ~= -1 then ndx, ndy = 1, 0
-    end
-    if not running and not over then running = true; scoreline() end
-  elseif ev.type == "down" and over then
-    reset()
-    scoreline()
-    draw()
-  end
-end
-
-function app.on_tick(dt)
-  if running and not over then step() end
-end
-
-function app.on_close()
-  -- high score is already persisted on set; nothing to tear down (the host
-  -- frees every widget and the canvas with the app)
-end
-
-return app
-)WADALUA";
 static const char kLuaSrc_sdktest[] = R"WADALUA(-- SDK self-test. Exercises the extended SDK so the results can be read off the
 -- screen instead of inferred from a build log. Published to the store as a
 -- developer/bench tool.
@@ -622,875 +500,50 @@ end
 
 return app
 )WADALUA";
-static const char kLuaSrc_2048[] = R"WADALUA(-- 2048 — wada.* reference app
--- Swipe (or trackball mapped swipe) to move tiles.
--- Tap after win or game over to restart.
-
-local ui, sys, store, timer = wada.ui, wada.sys, wada.store, wada.timer
-local C = ui.colors
-
-local app = {}
-
-local cv, score_lbl
-
-local CELL = 38
-
-local grid = {}
-
-local history = {
-    grids = {},
-    maxsize = 5
-}
-
-local px_w, px_h
-local score = 0
-local hiscore = 0
-
-local over = false
-local won = false
-
-
---------------------------------------------------
--- History
---------------------------------------------------
-
-function history:save()
-
-    local old = {
-        grid = {},
-        score = score,
-        over = over,
-        won = won
-    }
-
-    for x = 1, 4 do
-
-        old.grid[x] = {}
-
-        for y = 1, 4 do
-            old.grid[x][y] = grid[x][y]
-        end
-
-    end
-
-    table.insert(self.grids, old)
-
-    if #self.grids > self.maxsize then
-        table.remove(self.grids, 1)
-    end
-
-end
-
-
-function history:revert()
-
-    if #self.grids > 0 then
-
-        local old = table.remove(self.grids)
-
-        grid = old.grid
-        score = old.score
-        over = old.over
-        won = old.won
-
-    end
-
-end
-
-
---------------------------------------------------
--- Game logic
---------------------------------------------------
-
-local function clear_grid()
-
-    grid = {}
-
-    for x = 1, 4 do
-
-        grid[x] = {}
-
-        for y = 1, 4 do
-            grid[x][y] = 0
-        end
-
-    end
-
-end
-
-
---------------------------------------------------
--- Add random tile
---------------------------------------------------
-
-local function add_random_tile()
-
-    local free = {}
-
-    for x = 1, 4 do
-
-        for y = 1, 4 do
-
-            if grid[x][y] == 0 then
-
-                table.insert(
-                    free,
-                    {
-                        x = x,
-                        y = y
-                    }
-                )
-
-            end
-
-        end
-
-    end
-
-
-    -- Board is full.
-    if #free == 0 then
-        return false
-    end
-
-
-    local p
-
-
-    -- If there is only one empty cell,
-    -- use it directly.
-    if #free == 1 then
-
-        p = free[1]
-
-    else
-
-        local index = sys.random(1, #free)
-
-        if index == nil then
-            return false
-        end
-
-        p = free[index]
-
-        if p == nil then
-            return false
-        end
-
-    end
-
-
-    -- 10% chance for 4,
-    -- 90% chance for 2.
-    if sys.random(0, 9) == 0 then
-        grid[p.x][p.y] = 4
-    else
-        grid[p.x][p.y] = 2
-    end
-
-    return true
-
-end
-
-
---------------------------------------------------
--- Reset
---------------------------------------------------
-
-local function reset()
-
-    clear_grid()
-
-    score = 0
-    over = false
-    won = false
-
-    history.grids = {}
-
-    add_random_tile()
-    add_random_tile()
-
-end
-
-
---------------------------------------------------
--- Compress line
---------------------------------------------------
-
-local function compress(line)
-
-    local r = {}
-
-    for i = 1, 4 do
-
-        if line[i] ~= 0 then
-            table.insert(r, line[i])
-        end
-
-    end
-
-    while #r < 4 do
-        table.insert(r, 0)
-    end
-
-    return r
-
-end
-
-
---------------------------------------------------
--- Merge line
---------------------------------------------------
-
-local function merge(line)
-
-    local r = {}
-    local i = 1
-
-    while i <= 4 do
-
-        if i < 4
-            and line[i] ~= 0
-            and line[i] == line[i + 1]
-        then
-
-            local v = line[i] * 2
-
-            table.insert(r, v)
-
-            score = score + v
-
-
-            -- Permanent high score.
-            if score > hiscore then
-
-                hiscore = score
-
-                store.set(
-                    "2048_best",
-                    hiscore
-                )
-
-            end
-
-
-            -- Reaching 2048 means victory.
-            if v >= 2048 then
-                won = true
-            end
-
-
-            i = i + 2
-
-        else
-
-            table.insert(r, line[i])
-
-            i = i + 1
-
-        end
-
-    end
-
-
-    while #r < 4 do
-        table.insert(r, 0)
-    end
-
-    return r
-
-end
-
-
---------------------------------------------------
--- Move left
---------------------------------------------------
-
-local function move_left()
-
-    local changed = false
-
-    for y = 1, 4 do
-
-        local old = {}
-        local line = {}
-
-        for x = 1, 4 do
-
-            old[x] = grid[x][y]
-            line[x] = grid[x][y]
-
-        end
-
-
-        line = compress(line)
-        line = merge(line)
-
-
-        for x = 1, 4 do
-
-            grid[x][y] = line[x]
-
-            if old[x] ~= line[x] then
-                changed = true
-            end
-
-        end
-
-    end
-
-    return changed
-
-end
-
-
---------------------------------------------------
--- Rotate
---------------------------------------------------
-
-local function rotate()
-
-    local n = {}
-
-    for x = 1, 4 do
-        n[x] = {}
-    end
-
-
-    for x = 1, 4 do
-
-        for y = 1, 4 do
-
-            n[y][5 - x] = grid[x][y]
-
-        end
-
-    end
-
-
-    grid = n
-
-end
-
-
---------------------------------------------------
--- Game over
---------------------------------------------------
-
-local function game_over()
-
-    -- Any empty cell means the game can continue.
-    for x = 1, 4 do
-
-        for y = 1, 4 do
-
-            if grid[x][y] == 0 then
-                return false
-            end
-
-        end
-
-    end
-
-
-    -- Check horizontal and vertical merges.
-    for x = 1, 4 do
-
-        for y = 1, 4 do
-
-            if x < 4
-                and grid[x][y] == grid[x + 1][y]
-            then
-                return false
-            end
-
-
-            if y < 4
-                and grid[x][y] == grid[x][y + 1]
-            then
-                return false
-            end
-
-        end
-
-    end
-
-
-    -- Board is full and no merge is possible.
-    return true
-
-end
-
-
---------------------------------------------------
--- Move
---------------------------------------------------
-
-local function move(dir)
-
-    -- Do nothing after victory or defeat.
-    if over or won then
-        return
-    end
-
-
-    history:save()
-
-    local changed = false
-
-
-    if dir == "left" then
-
-        changed = move_left()
-
-
-    elseif dir == "right" then
-
-        rotate()
-        rotate()
-
-        changed = move_left()
-
-        rotate()
-        rotate()
-
-
-    elseif dir == "up" then
-
-        rotate()
-
-        changed = move_left()
-
-        rotate()
-        rotate()
-        rotate()
-
-
-    elseif dir == "down" then
-
-        rotate()
-        rotate()
-        rotate()
-
-        changed = move_left()
-
-        rotate()
-
-    end
-
-
-    --------------------------------------------------
-    -- Nothing moved.
-    --------------------------------------------------
-
-    if not changed then
-
-        history:revert()
-
-        return
-
-    end
-
-
-    --------------------------------------------------
-    -- Successful move.
-    -- Exactly one new tile must be created.
-    --------------------------------------------------
-
-    local added = add_random_tile()
-
-
-    --------------------------------------------------
-    -- This should only happen if the board was already
-    -- completely full. Normally a successful move on a
-    -- full board creates space, so added should be true.
-    --------------------------------------------------
-
-    if not added then
-
-        over = true
-
-        return
-
-    end
-
-
-    --------------------------------------------------
-    -- Victory.
-    --
-    -- merge() sets won when a 2048 tile is created.
-    --------------------------------------------------
-
-    if won then
-        return
-    end
-
-
-    --------------------------------------------------
-    -- IMPORTANT:
-    --
-    -- Game-over is checked AFTER the new random tile
-    -- has been inserted.
-    --------------------------------------------------
-
-    if game_over() then
-        over = true
-    end
-
-end
-
-
---------------------------------------------------
--- Tile colors
---------------------------------------------------
-
-local function tile_color(v)
-
-    if v == 0 then
-        return 0xCDC1B4
-
-    elseif v == 2 then
-        return 0xEEE4DA
-
-    elseif v == 4 then
-        return 0xEDE0C8
-
-    elseif v == 8 then
-        return 0xF2B179
-
-    elseif v == 16 then
-        return 0xF59563
-
-    elseif v == 32 then
-        return 0xF67C5F
-
-    elseif v == 64 then
-        return 0xF65E3B
-
-    elseif v == 128 then
-        return 0xEDCF72
-
-    elseif v == 256 then
-        return 0xEDCC61
-
-    elseif v == 512 then
-        return 0xEDC850
-
-    elseif v == 1024 then
-        return 0xEDC53F
-
-    elseif v == 2048 then
-        return 0xEDC22E
-
-    end
-
-    -- Values above 2048.
-    return 0x3C3A32
-
-end
-
-
---------------------------------------------------
--- Text colors
---------------------------------------------------
-
-local function text_color(v)
-
-    if v <= 4 then
-        return 0x776E65
-    else
-        return 0xFFFFFF
-    end
-
-end
-
-
---------------------------------------------------
--- Text size
---------------------------------------------------
-
-local function text_size(v)
-
-    if v < 100 then
-        return 16
-
-    elseif v < 1000 then
-        return 14
-
-    elseif v < 10000 then
-        return 11
-
-    else
-        return 9
-    end
-
-end
-
-
---------------------------------------------------
--- Text positioning
---------------------------------------------------
-
-local function text_x(px, v, size)
-
-    local width
-
-    if v < 100 then
-        width = size * 1.1
-
-    elseif v < 1000 then
-        width = size * 1.7
-
-    elseif v < 10000 then
-        width = size * 2.3
-
-    else
-        width = size * 2.9
-    end
-
-
-    return px + math.floor(
-        (CELL - width) / 2
-    )
-
-end
-
-
-local function text_y(py, size)
-
-    return py + math.floor(
-        (CELL - size) / 2
-    )
-
-end
-
-
---------------------------------------------------
--- Score line
---------------------------------------------------
-
-local function scoreline()
-
-    local status = ""
-
-    if won then
-
-        status = "   - tap retry"
-
-    elseif over then
-
-        status = "   - tap retry"
-
-    end
-
-
-    score_lbl:set(
-        string.format(
-            "Score %d   Best %d%s",
-            score,
-            hiscore,
-            status
-        )
-    )
-
-end
-
-
---------------------------------------------------
--- Draw
---------------------------------------------------
-
-local function draw()
-
-    cv:fill(0x101418)
-
-
-    for x = 1, 4 do
-
-        for y = 1, 4 do
-
-            local px = (x - 1) * CELL
-            local py = (y - 1) * CELL
-
-            local v = grid[x][y]
-
-
-            cv:rect(
-                px + 2,
-                py + 2,
-                CELL - 4,
-                CELL - 4,
-                tile_color(v),
-                true,
-                4
-            )
-
-
-            if v > 0 then
-
-                local size = text_size(v)
-
-                cv:text(
-                    text_x(px, v, size),
-                    text_y(py, size),
-                    tostring(v),
-                    text_color(v),
-                    size
-                )
-
-            end
-
-        end
-
-    end
-
-
-    --------------------------------------------------
-    -- End messages
-    --------------------------------------------------
-
-    if won then
-
-        cv:text(
-            30,
-            px_h / 2,
-            "YOU WIN!",
-            C.good,
-            18
-        )
-
-    elseif over then
-
-        cv:text(
-            30,
-            px_h / 2,
-            "GAME OVER",
-            C.bad,
-            18
-        )
-
-    end
-
-end
-
-
---------------------------------------------------
--- WADAMESH API
---------------------------------------------------
-
-function app.on_open(w, h)
-
-    hiscore = store.get(
-        "2048_best",
-        0
-    )
-
-
-    px_w = CELL * 4
-    px_h = CELL * 4
-
-
-    score_lbl = ui.label(
-        "",
-        4,
-        4,
-        14,
-        C.text
-    )
-
-
-    cv = ui.canvas(
-        px_w,
-        px_h
-    )
-
-
-    cv:pos(
-        math.floor(
-            (w - px_w) / 2
-        ),
-        28
-    )
-
-
-    reset()
-
-    scoreline()
-    draw()
-
-
-    timer.every(100)
-
-end
-
-
-function app.on_input(ev)
-
-    if ev.type == "swipe" then
-
-        move(ev.dir)
-
-        scoreline()
-        draw()
-
-
-    elseif ev.type == "down"
-        and (over or won)
-    then
-
-        reset()
-
-        scoreline()
-        draw()
-
-    end
-
-end
-
-
-function app.on_tick(dt)
-
-end
-
-
-function app.on_close()
-
-end
-
-
-return app
-)WADALUA";
-static const char kLuaSrc_wardrive[] = R"WADALUA(-- Wardrive (Lua) — a LoRa coverage survey that logs to a CSV you can pull off
--- the device afterwards.
+static const char kLuaSrc_wardrive[] = R"WADALUA(-- Wardrive v1.2 — LoRa coverage survey with live signal map.
 --
--- Reference app for the discovery half of the SDK. It works the way a survey
--- has to work: it PROBES rather than listens. A probe is a zero-hop request
--- that every node in earshot answers, so a reply proves the link works from
--- exactly where you are standing. Listening only ever tells you what happened
--- to transmit while you were there, which is a different and much weaker claim.
+-- Two views, tap the tab bar to switch:
+--   MAP   — full-screen track coloured by best SNR. Green ≥0 dB, amber ≥-10,
+--            red <-10. Current position shown as a dot.
+--   NODES — node table sorted by best SNR with per-node SNR asymmetry.
+--            ↓ = they heard us (their_snr), ↑ = we heard them (best SNR).
 --
--- Each reply carries both directions of the link: how well we heard them, and
--- how well they heard us. They are rarely equal, and the asymmetry is the point
--- -- "I can hear the repeater but it cannot hear me" is not the same fact as
--- "no coverage", and only a probe reveals it.
+-- Each view rebuilds via ui.clear() on switch; stale handles become no-ops
+-- (generation-tagged by the SDK). Map is closed before clear to release it.
+--
+-- CSV columns: epoch,lat_e6,lon_e6,alt_m,pubkey,name,type,rssi,snr,their_snr,hops
 local ui, sys, mesh, fs, timer = wada.ui, wada.sys, wada.mesh, wada.fs, wada.timer
 local C = ui.colors
 local app = {}
 
-local SWEEP_MS = 20000        -- above the 15 s floor the firmware enforces on probes
-local HARVEST_MS = 4000       -- replies land over the few seconds after a probe
-local TYPE = { [1]="chat", [2]="repeater", [3]="room", [4]="sensor" }
+-- ── constants ────────────────────────────────────────────────────────────────
+local SWEEP_MS   = 20000   -- ≥15 s probe floor enforced by firmware
+local HARVEST_MS = 4000    -- replies arrive over ~4 s after a probe
+local TYPE = { [1]="chat", [2]="rep", [3]="room", [4]="sensor" }
+local SNR_GOOD, SNR_OK = 0, -10   -- dB thresholds: good / marginal / bad
 
-local run, running, samples, sweeps, last_err = "wd", false, 0, 0, nil
-local node_count = 0
+-- ── persistent survey state (survives view switches) ─────────────────────────
+local run, running = "wd", false
+local samples, sweeps, node_count = 0, 0, 0
+local last_err = nil
 local phase, phase_at = "idle", 0
-local hdr, gps_lbl, stat_lbl, rows = nil, nil, nil, {}
-local nodes = {}              -- pubkey -> { name, type, best, worst, seen }
-local pending = {}            -- lines waiting on the 1 write/sec limit
+local nodes   = {}   -- pubkey → { name, type, best, worst, their_snr, rssi, seen }
+local pending = {}   -- write queue (fs allows 1 write/s)
+local wrote_header = false
+local track = {}     -- { lat, lon, snr } breadcrumb for the map
 
--- Generate a timestamped default run name so each session gets its own file.
--- Falls back to wd_<epoch> when the clock is not yet set, and to plain "wd"
--- if neither is available (no GPS/NTP yet at all).
+-- ── per-view UI handles (rebuilt on every switch) ────────────────────────────
+local MAP_VIEW, NODE_VIEW = 1, 2
+local cur_view = MAP_VIEW
+local W, H = 0, 0
+
+local map_obj   = nil   -- wada.map handle, nil when in node view
+local node_list = nil   -- wada.list handle, nil when in map view
+local status_lbl = nil
+local gps_lbl    = nil
+local start_btn  = nil
+
+-- ── helpers ──────────────────────────────────────────────────────────────────
 local function default_run_name()
   local dt = sys.datetime and sys.datetime()
   if dt then
@@ -1504,64 +557,60 @@ end
 
 local function logname() return run .. ".csv" end
 
--- Return at most max_bytes without splitting a UTF-8 sequence. The row's
--- fixed-width columns are byte-budgeted, not character-budgeted; a raw
--- string.sub(1, 14) cut Ouderkerk + sun + VS16 inside the final codepoint and
--- left LVGL unable to advance through the label (#323, same class as #223).
-local function utf8_prefix_bytes(text, max_bytes)
-  local offset, last, length = 1, 0, #text
-  while offset <= length and offset <= max_bytes do
-    local first = text:byte(offset)
-    local width = first <= 0x7F and 1
-      or (first >= 0xC2 and first <= 0xDF and 2)
-      or (first >= 0xE0 and first <= 0xEF and 3)
-      or (first >= 0xF0 and first <= 0xF4 and 4) or 0
-    if width == 0 or offset + width - 1 > length or offset + width - 1 > max_bytes then break end
-    local valid = true
-    for i = 2, width do
-      local byte = text:byte(offset + i - 1)
-      if byte < 0x80 or byte > 0xBF then valid = false; break end
+local function utf8_trunc(text, max_bytes)
+  local offset, last, len = 1, 0, #text
+  while offset <= len and offset <= max_bytes do
+    local b = text:byte(offset)
+    local w = (b <= 0x7F and 1) or (b >= 0xC2 and b <= 0xDF and 2)
+           or (b >= 0xE0 and b <= 0xEF and 3) or (b >= 0xF0 and b <= 0xF4 and 4) or 0
+    if w == 0 or offset + w - 1 > len or offset + w - 1 > max_bytes then break end
+    local ok = true
+    for i = 2, w do
+      local c = text:byte(offset + i - 1)
+      if c < 0x80 or c > 0xBF then ok = false; break end
     end
-    local second = width > 1 and text:byte(offset + 1) or 0
-    if (first == 0xE0 and second < 0xA0) or (first == 0xED and second > 0x9F) or
-       (first == 0xF0 and second < 0x90) or (first == 0xF4 and second > 0x8F) then valid = false end
-    if not valid then break end
-    last = offset + width - 1
-    offset = last + 1
+    local b2 = w > 1 and text:byte(offset + 1) or 0
+    if (b == 0xE0 and b2 < 0xA0) or (b == 0xED and b2 > 0x9F) or
+       (b == 0xF0 and b2 < 0x90) or (b == 0xF4 and b2 > 0x8F) then ok = false end
+    if not ok then break end
+    last = offset + w - 1; offset = last + 1
   end
   return text:sub(1, last)
 end
 
--- Lua here is built with 32-bit floats, so fix.lat is good to about a metre and
--- no better. fix.lat_e6 is the same reading as an exact integer in
--- micro-degrees, which is what belongs in a log: a survey you plot months later
--- should not carry rounding the device never had.
-local HEADER = "epoch,lat_e6,lon_e6,alt_m,pubkey,name,type,rssi,snr,their_snr,hops"
-local wrote_header = false
+local function snr_color(snr)
+  if     snr >= SNR_GOOD then return C.good
+  elseif snr >= SNR_OK   then return 0xC8A030
+  else                        return C.bad end
+end
 
--- The filesystem allows one write a second. Sweeps produce a burst of rows, so
--- they queue here and drain a chunk per tick instead of being dropped.
+-- ── CSV write queue ──────────────────────────────────────────────────────────
+local HEADER = "epoch,lat_e6,lon_e6,alt_m,pubkey,name,type,rssi,snr,their_snr,hops"
+
 local function flush()
   if #pending == 0 then return end
   local chunk = table.concat(pending, "\n") .. "\n"
   if not wrote_header then chunk = HEADER .. "\n" .. chunk end
-  local ok = fs.append(logname(), chunk)
-  if ok then pending, wrote_header = {}, true end
+  if fs.append(logname(), chunk) then pending, wrote_header = {}, true end
 end
 
 local function record(fix, hit)
   local key = hit.pubkey
   local n = nodes[key]
   if not n then
-    n = { name = hit.name or key, type = hit.type, best = hit.snr, worst = hit.snr, seen = 0 }
+    n = { name = hit.name or key:sub(1,8), type = hit.type,
+          best = hit.snr, worst = hit.snr,
+          their_snr = hit.their_snr, rssi = hit.rssi, seen = 0 }
     nodes[key] = n
     node_count = node_count + 1
+  else
+    if hit.snr > n.best  then n.best  = hit.snr end
+    if hit.snr < n.worst then n.worst = hit.snr end
+    n.their_snr = hit.their_snr
+    n.rssi      = hit.rssi
+    if hit.name then n.name = hit.name end
   end
-  if hit.snr > n.best  then n.best  = hit.snr end
-  if hit.snr < n.worst then n.worst = hit.snr end
   n.seen = n.seen + 1
-  if hit.name then n.name = hit.name end
-
   samples = samples + 1
   pending[#pending + 1] = string.format("%d,%d,%d,%d,%s,%s,%d,%d,%.2f,%.2f,%d",
     fix.time or sys.epoch(), fix.lat_e6, fix.lon_e6, fix.alt_m or 0,
@@ -1569,104 +618,172 @@ local function record(fix, hit)
     hit.rssi, hit.snr, hit.their_snr, hit.hops)
 end
 
-local function sweep()
-  local tag, err = mesh.discover()          -- every node type
-  if not tag then last_err = err; return false end
-  last_err = nil
-  sweeps = sweeps + 1
-  return true
+-- ── probe / harvest ──────────────────────────────────────────────────────────
+local function do_sweep()
+  local ok, err = mesh.discover()
+  if not ok then last_err = err; return false end
+  last_err = nil; sweeps = sweeps + 1; return true
 end
 
-local function harvest()
+local function do_harvest()
   local fix = sys.gps()
-  if not fix then
-    -- No fix means the sample cannot be placed, so it is discarded rather than
-    -- logged at 0,0. A survey file with phantom points at Null Island is worse
-    -- than a shorter one.
-    mesh.discover_clear()
-    return
+  if not fix then mesh.discover_clear(); return end
+  local best_snr = nil
+  for _, hit in ipairs(mesh.discovered()) do
+    record(fix, hit)
+    if not best_snr or hit.snr > best_snr then best_snr = hit.snr end
   end
-  for _, hit in ipairs(mesh.discovered()) do record(fix, hit) end
-  mesh.discover_clear()                     -- next sample must not inherit this one
+  mesh.discover_clear()
+  if fix.lat_e6 ~= 0 or fix.lon_e6 ~= 0 then
+    track[#track + 1] = { lat = fix.lat_e6 / 1e6, lon = fix.lon_e6 / 1e6, snr = best_snr }
+  end
 end
 
-local function redraw()
+-- ── draw helpers (called from on_tick; handles may be nil if wrong view) ─────
+local function redraw_map()
+  if not map_obj then return end
+  map_obj:clear()
   local fix = sys.gps()
-  if fix then
-    gps_lbl:set(string.format("%.5f, %.5f  %dm  %d sats", fix.lat, fix.lon, fix.alt_m or 0, fix.sats))
-    gps_lbl:color(C.good)
-  else
-    gps_lbl:set("waiting for a GPS fix - samples are discarded until then")
-    gps_lbl:color(C.bad)
+  if fix and (fix.lat_e6 ~= 0 or fix.lon_e6 ~= 0) then
+    map_obj:center(fix.lat_e6 / 1e6, fix.lon_e6 / 1e6)
   end
+  for i = 2, #track do
+    local a, b = track[i-1], track[i]
+    map_obj:line(a.lat, a.lon, b.lat, b.lon, b.snr and snr_color(b.snr) or 0x444C54, 3)
+  end
+  if fix and (fix.lat_e6 ~= 0 or fix.lon_e6 ~= 0) then
+    map_obj:marker(fix.lat_e6 / 1e6, fix.lon_e6 / 1e6, C.accent, 6)
+  end
+  map_obj:redraw()
+end
 
-  local state = running and (phase == "probe" and "listening..." or "sweeping") or "stopped"
-  stat_lbl:set(string.format("%s  |  %s  |  %d sweeps, %d samples, %d nodes%s",
-    run, state, sweeps, samples, node_count,
-    last_err and ("  [" .. last_err .. "]") or ""))
-  stat_lbl:color(last_err and C.bad or C.accent)
-
+local function redraw_nodes()
+  if not node_list then return end
+  node_list:clear()
   local list = {}
   for key, n in pairs(nodes) do list[#list + 1] = { key = key, n = n } end
   table.sort(list, function(a, b) return a.n.best > b.n.best end)
-  for i = 1, #rows do
-    local e = list[i]
-    if e then
-      rows[i]:set(string.format("%-14s %-8s best %5.1f  worst %5.1f  x%d",
-        utf8_prefix_bytes(e.n.name, 14), TYPE[e.n.type] or "?", e.n.best, e.n.worst, e.n.seen))
-      rows[i]:color(e.n.best > 0 and C.good or C.text)
-    else
-      rows[i]:set(i == 1 and "nothing has answered a probe yet" or "")
-      rows[i]:color(C.sub)
-    end
+  if #list == 0 then node_list:add("(no replies yet)", 0, C.sub); return end
+  for _, e in ipairs(list) do
+    local n = e.n
+    local label = string.format("%-10s %-6s  \xe2\x86\x93%+5.1f  \xe2\x86\x91%+5.1f  \xc3\x97%d",
+      utf8_trunc(n.name, 10), TYPE[n.type] or "?", n.their_snr, n.best, n.seen)
+    node_list:add(label, 0, snr_color(n.best))
   end
 end
 
-function app.on_open(w, h)
-  if not sys.caps().discover then
-    ui.label("This board does not carry the extended SDK,", 6, 8, 12, C.bad)
-    ui.label("so it cannot send discovery probes.", 6, 26, 12, C.bad)
-    return
+local function redraw_status()
+  if not status_lbl then return end
+  local fix = sys.gps()
+  if fix and (fix.lat_e6 ~= 0 or fix.lon_e6 ~= 0) then
+    gps_lbl:set(string.format("%.5f %.5f  %dm  %dsat",
+      fix.lat_e6 / 1e6, fix.lon_e6 / 1e6, fix.alt_m or 0, fix.sats or 0))
+    gps_lbl:color(C.good)
+  else
+    gps_lbl:set("no GPS fix \xe2\x80\x94 samples discarded until locked")
+    gps_lbl:color(C.bad)
   end
-  run = default_run_name()   -- unique per session; user can rename via the Name button
-  ui.scroll(true)
+  local state_str
+  if not running then
+    state_str = "stopped"
+  elseif phase == "probe" then
+    state_str = "listening\xe2\x80\xa6"
+  else
+    local rem = math.max(0, SWEEP_MS - (sys.millis() - phase_at))
+    state_str = string.format("next probe %ds", math.ceil(rem / 1000))
+  end
+  status_lbl:set(string.format("%s  \xe2\x80\xa2  %d sweeps  %d nodes%s",
+    state_str, sweeps, node_count,
+    last_err and ("  [\xe2\x9a\xa0 " .. last_err .. "]") or ""))
+  status_lbl:color(last_err and C.bad or (running and C.accent or C.sub))
+end
+
+-- ── view builder (called on open and on every tab switch) ────────────────────
+local function build_view(v)
+  cur_view = v
+
+  -- release map before wiping widgets (one-at-a-time SDK limit)
+  if map_obj then map_obj:close(); map_obj = nil end
+  ui.clear()
+
+  -- null out handles — generation bump made them stale anyway
+  node_list, status_lbl, gps_lbl, start_btn = nil, nil, nil, nil
+
   local LH = ui.text_h(12)
-  local y = 4
+  local y = 2
 
-  hdr = ui.label("LoRa coverage survey", 4, y, 12, C.accent); hdr:width(w - 10); y = y + LH + 3
-  gps_lbl = ui.label("", 4, y, 12, C.sub); gps_lbl:width(w - 10); y = y + LH + 3
-  stat_lbl = ui.label("", 4, y, 12, C.text); stat_lbl:width(w - 10); y = y + LH * 2 + 5
+  gps_lbl    = ui.label("", 4, y, 12, C.sub);    gps_lbl:width(W - 8);    y = y + LH + 2
+  status_lbl = ui.label("", 4, y, 12, C.accent); status_lbl:width(W - 8); y = y + LH + 3
 
-  local bw = math.min(96, (w - 20) // 3)
-  ui.button("Start", 4, y, bw, 32, function()
+  -- control row
+  local bw = math.min(80, (W - 16) // 3)
+  start_btn = ui.button("Start", 4, y, bw, 26, function()
     running = not running
     if running then phase, phase_at = "idle", 0 end
-    sys.toast(running and "Survey running" or "Survey stopped", 1200)
+    start_btn:set(running and "Stop" or "Start")
+    sys.toast(running and "Survey running" or "Survey stopped", 1000)
   end)
-  ui.button("Name", 8 + bw, y, bw, 32, function()
+  if running then start_btn:set("Stop") end
+  ui.button("Name", 8 + bw, y, bw, 26, function()
     ui.input("Name this run", run, function(text)
-      if text then
+      if text and text ~= "" then
         run = text:gsub("[^%w%-_]", "_")
-        wrote_header = false          -- a new file needs its own header row
+        wrote_header = false
         sys.toast("Logging to " .. logname(), 1500)
       end
     end)
   end)
-  ui.button("Reset", 12 + bw * 2, y, bw, 32, function()
+  ui.button("Reset", 12 + bw * 2, y, bw, 26, function()
     nodes, samples, sweeps, pending, node_count = {}, 0, 0, {}, 0
-    mesh.discover_clear()
-    fs.remove(logname())
-    wrote_header = false
-    sys.toast("Cleared " .. logname(), 1200)
+    track = {}; mesh.discover_clear()
+    fs.remove(logname()); wrote_header = false
+    run = default_run_name()
+    sys.toast("Cleared \xe2\x80\x94 new run: " .. run, 1500)
+    redraw_nodes(); redraw_map()
   end)
-  y = y + 38
+  y = y + 30
 
-  ui.label("strongest first", 4, y, 12, C.sub); y = y + LH + 2
-  for i = 1, 12 do
-    rows[i] = ui.label("", 4, y, 12, C.text); rows[i]:width(w - 10); y = y + LH + 2
+  -- tab bar
+  local has_map = sys.caps().map
+  if has_map then
+    local tw = (W - 12) // 2
+    local mb = ui.button("Map",   4,      y, tw, 24, function() build_view(MAP_VIEW)  end)
+    local nb = ui.button("Nodes", 8 + tw, y, tw, 24, function() build_view(NODE_VIEW) end)
+    mb:color(v == MAP_VIEW  and C.accent or C.sub)
+    nb:color(v == NODE_VIEW and C.accent or C.sub)
+    y = y + 28
   end
 
-  redraw()
+  local content_h = H - y - 2
+
+  if v == MAP_VIEW and has_map then
+    map_obj = wada.map.view(4, y, W - 8, content_h)
+    local fix = sys.gps()
+    if fix and (fix.lat_e6 ~= 0 or fix.lon_e6 ~= 0) then
+      map_obj:center(fix.lat_e6 / 1e6, fix.lon_e6 / 1e6, 13)
+    else
+      map_obj:zoom(13)
+    end
+    redraw_map()
+  else
+    -- NODE_VIEW, or MAP_VIEW on a board without map support
+    node_list = ui.list(4, y, W - 8, content_h, function(_idx) end)
+    redraw_nodes()
+  end
+
+  redraw_status()
+end
+
+-- ── app callbacks ─────────────────────────────────────────────────────────────
+function app.on_open(w, h)
+  if not sys.caps().discover then
+    ui.label("This board does not support discovery probes.", 6, 8, 12, C.bad)
+    return
+  end
+  W, H = w, h
+  run = default_run_name()
+  ui.scroll(false)
+  build_view(MAP_VIEW)
   timer.every(1000)
 end
 
@@ -1674,20 +791,29 @@ function app.on_tick()
   if running then
     local now = sys.millis()
     if phase == "idle" or (phase == "wait" and now - phase_at >= SWEEP_MS) then
-      -- A refused or rate-limited probe backs off a full sweep interval. Retrying
-      -- every tick would re-enter the permission path once a second for nothing.
-      phase, phase_at = sweep() and "probe" or "wait", now
+      phase, phase_at = do_sweep() and "probe" or "wait", now
     elseif phase == "probe" and now - phase_at >= HARVEST_MS then
-      harvest()
-      phase = "wait"          -- phase_at stays at the probe time, so sweeps stay on cadence
+      do_harvest()
+      phase = "wait"
+      redraw_map()
+      redraw_nodes()
     end
   end
   flush()
-  redraw()
+  redraw_status()
+  -- keep position dot moving between sweeps
+  if map_obj then
+    local fix = sys.gps()
+    if fix and (fix.lat_e6 ~= 0 or fix.lon_e6 ~= 0) then
+      map_obj:center(fix.lat_e6 / 1e6, fix.lon_e6 / 1e6)
+      map_obj:redraw()
+    end
+  end
 end
 
 function app.on_close()
-  flush()                     -- one last drain; anything queued would otherwise be lost
+  flush()
+  if map_obj then map_obj:close() end
 end
 
 return app
@@ -1830,39 +956,12 @@ end
 
 return app
 )WADALUA";
-static const char kLuaSrc_helloworld[] = R"WADALUA(-- Hello World — minimal Lua app to verify the app host is working.
-local ui, sys = wada.ui, wada.sys
-local C = ui.colors
-local app = {}
-
-local lbl, sub
-
-function app.on_open(w, h)
-  lbl = ui.label(0, h / 2 - 20, w, 30)
-  lbl:set("Hello, World!")
-  lbl:color(C.accent)
-  lbl:align("center")
-
-  sub = ui.label(0, h / 2 + 16, w, 20)
-  sub:set("Lua app host is working  \xE2\x80\x94  " .. (sys.board() or ""))
-  sub:color(C.sub)
-  sub:align("center")
-end
-
-function app.on_close()
-end
-
-return app
-)WADALUA";
 
 static const LuaBuiltinApp kLuaBuiltin[] = {
   { "monitor", "RF Monitor", "1.3", kLuaSrc_monitor },
   { "airtime", "Airtime", "1.4", kLuaSrc_airtime },
-  { "snake", "Snake", "1.0", kLuaSrc_snake },
   { "sdktest", "SDK Test", "1.7", kLuaSrc_sdktest },
-  { "2048", "2048", "1.2", kLuaSrc_2048 },
-  { "wardrive", "Wardrive", "1.1.1", kLuaSrc_wardrive },
+  { "wardrive", "Wardrive", "1.2", kLuaSrc_wardrive },
   { "nearby", "Nearby", "1.0", kLuaSrc_nearby },
-  { "helloworld", "Hello World", "1.0", kLuaSrc_helloworld },
 };
 static const int kLuaBuiltinCount = (int)(sizeof(kLuaBuiltin)/sizeof(kLuaBuiltin[0]));

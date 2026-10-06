@@ -6980,6 +6980,15 @@ static void tabChangedCb(lv_event_t* e) {
     if (t) lv_obj_scroll_to(t, 0, 0, LV_ANIM_OFF);
   }
 
+  // Force the thread-list to re-sort and show fresh unread counts when returning
+  // to the Chats tab. The list uses a signature cache to skip redundant rebuilds,
+  // but that signature already includes ts + unread, so clearing list_sig here
+  // is enough to guarantee one rebuild on the next refreshChatList call.
+  if (new_t == CHAT_INBOX_TAB_INDEX && s_lv_tab_prev != CHAT_INBOX_TAB_INDEX) {
+    g_lv.dm.list_sig = 0;   // invalidate cache → next refreshChatList rebuilds the list
+    refreshChatList(g_lv.dm);  // rebuild immediately so the user sees up-to-date order + counts
+  }
+
   const int prev_t = s_lv_tab_prev;
   s_lv_tab_prev = new_t;
   // App-drawer view follows the Home tab — ALL of it lives here, one owner. The
@@ -30802,6 +30811,9 @@ static bool chatVirtTryAppendLayout(LvChatPanel* p, int n, int divider_i) {
 static bool chatVirtRebuildLayout(LvChatPanel* p, int n, int divider_i) {
   if (!p || !g_lv.task || n <= 0 || !s_chat_msg_idx) return false;
   if (chatVirtTryAppendLayout(p, n, divider_i)) return true;
+  // Full rebuild (not pure append): ring may have rotated or thread switched.
+  // Stale ring_idx values in the pool could produce false cache hits — destroy.
+  if (s_chat_virt.n > 0) chatPoolDestroy();
   chatVirtFreeOffsets();
   s_chat_virt.offsets = (int32_t*)heap_caps_malloc(sizeof(int32_t) * (size_t)(n + 1),
                                                     MALLOC_CAP_SPIRAM);
@@ -31768,6 +31780,10 @@ static void refreshChatDetail(LvChatPanel& p) {
     s_chat_virt.spacer = nullptr;
     s_chat_virt.divider = nullptr;
     s_chat_virt.scroll_virt_valid = false;
+    // Pool slots are lv_obj children of the previous panel's msgs container.
+    // Reusing them in a different panel would attach them to the wrong parent
+    // and make bubbles invisible or appear in the other chat.
+    if (changing_panel) chatPoolDestroy();
   }
   if (need_layout) {
     lv_indev_reset(nullptr, nullptr);
@@ -46953,14 +46969,12 @@ void UITask::appSentMsgToContact(const uint8_t* to_pub, const char* to_name, con
                                  uint32_t ack_hash, uint32_t sent_fp) {
   if (!to_name || !to_name[0] || !text || !text[0]) return;
   const char* sender = (_node_prefs && _node_prefs->node_name[0]) ? _node_prefs->node_name : "me";
-  // Mirror an app-originated DM as a local outgoing bubble in the recipient's thread (#46) — the
-  // on-device UI is otherwise the only message consumer that never sees sends made from the
-  // companion app. appendMessage creates the thread if it doesn't exist and refreshes the view.
-  // sent_fp links a locally-originated send (web/terminal) to the repeats-heard ring (0 = none).
   appendMessage(to_name, sender, text, false /*channel*/, true /*outgoing*/, false /*mark_unread*/,
                 ack_hash, DELIV_SENT, 0, 0, 0, 0, nullptr, 0, sent_fp);
-  // Lock the thread to the contact's pubkey so a reply typed on-device resolves it (mirrors the
-  // receive path above).
+#if defined(HAS_TOUCH_UI)
+  markThreadsDirty();
+  g_lv.dirty_timeline = true;
+#endif
   const int t = findThreadByName(to_name, false);
   if (t < 0 || !to_pub) return;
   _ui_threads[t].mesh_contact_idx = -1;
@@ -46982,6 +46996,10 @@ void UITask::appSentMsgToChannel(const char* channel_name, const char* text, uin
   // sent_fp links a locally-originated send (web/terminal) to the repeats-heard ring (0 = none).
   appendMessage(channel_name, sender, text, true /*channel*/, true /*outgoing*/, false /*mark_unread*/,
                 0 /*ack_hash*/, DELIV_SENT, 0, 0, 0, 0, nullptr, 0, sent_fp);
+#if defined(HAS_TOUCH_UI)
+  markThreadsDirty();
+  g_lv.dirty_timeline = true;
+#endif
 }
 
 void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) {
@@ -47926,8 +47944,14 @@ void UITask::loop() {
   }
   uiCp("ui:input");
   updateTrackball(now);
-  if (_screen_off || _manual_lock || s_remote_mode) tdeckKeyboardDiscardModifiers();
-  else                                              tdeckKeyboardAllowModifiers();
+  // Modifiers (shift/alt latch state) are only meaningful while the UI is live.
+  // Pre-discard for screen-off and remote mode, but NOT for _manual_lock: the
+  // lock screen must receive keys to wake/feed-PIN, and pre-discarding the ring
+  // here races against the core-0 keyboard poll (32 ms) — on the 50 ms throttle
+  // loop a key pressed just before this line gets wiped before the drain below
+  // can read it, causing ~50% missed keypresses on the lock screen.
+  if (_screen_off || s_remote_mode) tdeckKeyboardDiscardModifiers();
+  else                              tdeckKeyboardAllowModifiers();
   // Drain physical-keyboard presses buffered by the touch task into the field.
   for (int kbi = 0; kbi < 12; ++kbi) {
     int key = tdeckKeyboardReadKey();
